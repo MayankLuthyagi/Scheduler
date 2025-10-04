@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
@@ -12,12 +12,12 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (
-        typeof window !== 'undefined' && window.location.origin 
-            ? `${window.location.origin}/api` 
+        typeof window !== 'undefined' && window.location.origin
+            ? `${window.location.origin}/api`
             : '/api'
     );
 
-    // Clear any existing auth state on component mount
+    // Clear any existing auth state on component mount and handle redirect result
     useEffect(() => {
         const clearAuthState = async () => {
             try {
@@ -26,10 +26,99 @@ export default function LoginPage() {
                 console.log('No existing auth state to clear');
             }
         };
+
+        const handleRedirectResult = async () => {
+            try {
+                const result = await getRedirectResult(auth);
+                if (result && result.user) {
+                    // Handle successful redirect sign-in
+                    await handleSuccessfulSignIn(result.user);
+                }
+            } catch (error) {
+                console.error('Error handling redirect result:', error);
+                setError('Sign-in failed after redirect. Please try again.');
+            }
+        };
+
         clearAuthState();
+        handleRedirectResult();
     }, []);
 
-    // Sign in with Google
+    // Handle successful sign-in (shared between popup and redirect)
+    const handleSuccessfulSignIn = async (user: any) => {
+        if (!user || !user.email) {
+            throw new Error('No user information received');
+        }
+
+        // Fetch authorized emails with retry logic and fallback for ad blockers
+        let response;
+        let emailData;
+
+        try {
+            // Create a timeout promise for older browsers
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout')), 10000);
+            });
+
+            const fetchPromise = fetch(`${API_BASE_URL}/authUsers`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    // Add custom headers to avoid ad blocker detection
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+
+            response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            emailData = await response.json();
+        } catch (fetchError) {
+            console.error('Error fetching auth users:', fetchError);
+            
+            // If the primary fetch fails, try with different endpoint
+            try {
+                const fallbackResponse = await fetch('/api/authUsers', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (fallbackResponse.ok) {
+                    emailData = await fallbackResponse.json();
+                } else {
+                    throw new Error('Fallback request failed');
+                }
+            } catch (fallbackError) {
+                console.error('Fallback request also failed:', fallbackError);
+                setError('Unable to verify user permissions. Please disable ad blockers and try again.');
+                await auth.signOut();
+                return;
+            }
+        }
+
+        // Validate email
+        if (emailData?.success && emailData.users && emailData.users.some((userData: { email: string }) => userData.email === user.email)) {
+            localStorage.setItem('userEmail', user.email);
+            localStorage.setItem('userName', user.displayName || '');
+            localStorage.setItem('userPhoto', user.photoURL || '');
+
+            // Navigate to dashboard
+            router.push('/dashboard');
+        } else {
+            setError('Unauthorized user');
+            alert('Access Denied 🛑\n\nYou don\'t have access to this page.');
+            await auth.signOut();
+        }
+    };
+
+    // Sign in with Google (with fallback to redirect)
     const signInWithGoogle = async () => {
         if (isLoading) return; // Prevent multiple simultaneous calls
 
@@ -43,51 +132,24 @@ export default function LoginPage() {
             // Wait a bit to ensure sign out is complete
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            const result = await signInWithPopup(auth, googleProvider);
-            const user = result.user;
-
-            if (!user || !user.email) {
-                throw new Error('No user information received');
-            }
-
-            // Fetch authorized emails with retry logic
-            let response;
-            let emailData;
-            
             try {
-                response = await fetch(`${API_BASE_URL}/authUsers`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    // Add timeout and other fetch options for production
-                    signal: AbortSignal.timeout(10000), // 10 second timeout
-                });
+                // Try popup first
+                const result = await signInWithPopup(auth, googleProvider);
+                await handleSuccessfulSignIn(result.user);
+            } catch (popupError: any) {
+                console.error('Popup sign-in failed:', popupError);
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                // If popup fails, try redirect
+                if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                    console.log('Popup blocked, trying redirect method...');
+                    setError('Popup blocked. Redirecting to Google sign-in...');
+                    
+                    // Use redirect as fallback
+                    await signInWithRedirect(auth, googleProvider);
+                    return; // Don't continue execution as redirect will handle the rest
+                } else {
+                    throw popupError; // Re-throw other errors
                 }
-                
-                emailData = await response.json();
-            } catch (fetchError) {
-                console.error('Error fetching auth users:', fetchError);
-                setError('Unable to verify user permissions. Please try again.');
-                await auth.signOut();
-                return;
-            }
-
-            // Validate email
-            if (emailData?.success && emailData.users && emailData.users.some((userData: { email: string }) => userData.email === user.email)) {
-                localStorage.setItem('userEmail', user.email);
-                localStorage.setItem('userName', user.displayName || '');
-                localStorage.setItem('userPhoto', user.photoURL || '');
-
-                // Navigate to dashboard
-                router.push('/dashboard');
-            } else {
-                setError('Unauthorized user');
-                alert('Access Denied 🛑\n\nYou don\'t have access to this page.');
-                await auth.signOut();
             }
         } catch (error: unknown) {
             console.error('Error during sign-in:', error);
@@ -148,8 +210,28 @@ export default function LoginPage() {
                 {error && (
                     <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
                         {error}
+                        {error.includes('ad blocker') && (
+                            <div className="mt-2 text-sm">
+                                <p>If you're using an ad blocker, please:</p>
+                                <ul className="list-disc list-inside mt-1">
+                                    <li>Disable it for this site</li>
+                                    <li>Or add this site to your whitelist</li>
+                                    <li>Then refresh the page and try again</li>
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 )}
+
+                {/* Help Text */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded text-sm">
+                    <p><strong>Note:</strong> If sign-in fails, please ensure:</p>
+                    <ul className="list-disc list-inside mt-1">
+                        <li>Pop-ups are enabled for this site</li>
+                        <li>Ad blockers are disabled</li>
+                        <li>You have a stable internet connection</li>
+                    </ul>
+                </div>
 
                 {/* Sign-in Options */}
                 <div className="space-y-4">

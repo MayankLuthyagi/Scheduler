@@ -22,7 +22,8 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Add custom parameters to prevent caching issues and improve reliability
 googleProvider.setCustomParameters({
-    prompt: 'select_account'
+    prompt: 'select_account',
+    display: 'popup'
 });
 
 export default app;
