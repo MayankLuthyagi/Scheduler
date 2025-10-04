@@ -145,12 +145,6 @@ export default function ManageEmailPage() {
         }
     };
 
-    const cancelEdit = () => {
-        setEditingEmail(null);
-        setShowEditModal(false);
-        setError('');
-    };
-
     const deleteEmail = async (id: Email['_id']) => {
         try {
             setLoading(true);

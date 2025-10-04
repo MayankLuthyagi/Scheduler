@@ -116,12 +116,6 @@ export default function ManageUsersPage() {
         }
     };
 
-    const cancelEdit = () => {
-        setEditingUser(null);
-        setShowEditModal(false);
-        setError('');
-    };
-
     const fetchUsers = async () => {
         try {
             setLoading(true);
