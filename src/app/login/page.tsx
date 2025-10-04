@@ -18,7 +18,7 @@ export default function LoginPage() {
         const clearAuthState = async () => {
             try {
                 await auth.signOut();
-            } catch (error) {
+            } catch {
                 console.log('No existing auth state to clear');
             }
         };
@@ -51,7 +51,7 @@ export default function LoginPage() {
             const emailData = await response.json();
 
             // Validate email
-            if (emailData?.success && emailData.users && emailData.users.some((userData: any) => userData.email === user.email)) {
+            if (emailData?.success && emailData.users && emailData.users.some((userData: { email: string }) => userData.email === user.email)) {
                 localStorage.setItem('userEmail', user.email);
                 localStorage.setItem('userName', user.displayName || '');
                 localStorage.setItem('userPhoto', user.photoURL || '');
@@ -63,16 +63,21 @@ export default function LoginPage() {
                 alert('Access Denied 🛑\n\nYou don\'t have access to this page.');
                 await auth.signOut();
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error during sign-in:', error);
 
             // Handle specific Firebase errors
-            if (error.code === 'auth/popup-closed-by-user') {
-                setError('Sign-in was cancelled');
-            } else if (error.code === 'auth/popup-blocked') {
-                setError('Pop-up was blocked. Please allow pop-ups and try again');
-            } else if (error.code === 'auth/missing-or-invalid-nonce') {
-                setError('Authentication error. Please refresh the page and try again');
+            if (error && typeof error === 'object' && 'code' in error) {
+                const firebaseError = error as { code: string };
+                if (firebaseError.code === 'auth/popup-closed-by-user') {
+                    setError('Sign-in was cancelled');
+                } else if (firebaseError.code === 'auth/popup-blocked') {
+                    setError('Pop-up was blocked. Please allow pop-ups and try again');
+                } else if (firebaseError.code === 'auth/missing-or-invalid-nonce') {
+                    setError('Authentication error. Please refresh the page and try again');
+                } else {
+                    setError('Sign-in failed, please try again');
+                }
             } else {
                 setError('Sign-in failed, please try again');
             }

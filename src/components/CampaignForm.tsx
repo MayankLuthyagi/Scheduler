@@ -93,7 +93,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                     const data = await response.json();
                     if (data.success && Array.isArray(data.emails)) {
                         // Extract email addresses from the email objects
-                        const emailAddresses = data.emails.map((emailObj: any) => emailObj.email);
+                        const emailAddresses = data.emails.map((emailObj: { email: string }) => emailObj.email);
                         setAuthEmails(emailAddresses);
                     } else {
                         setAuthEmails([]);
@@ -108,7 +108,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         if (isOpen) {
             fetchAuthEmails();
         }
-    }, [isOpen]);
+    }, [isOpen, API_BASE_URL]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;

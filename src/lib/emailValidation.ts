@@ -41,10 +41,10 @@ export async function validateEmailDomain(email: string): Promise<EmailValidatio
             } else {
                 return { isValid: false, reason: 'No MX records found for domain' };
             }
-        } catch (dnsError) {
+        } catch {
             return { isValid: false, reason: 'Domain does not exist or has no MX records' };
         }
-    } catch (error) {
+    } catch {
         return { isValid: false, reason: 'Error validating email domain' };
     }
 }
