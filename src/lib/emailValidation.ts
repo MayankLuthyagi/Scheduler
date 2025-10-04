@@ -55,11 +55,6 @@ export async function validateEmailDomain(email: string): Promise<EmailValidatio
 export function checkCommonTypos(email: string): EmailValidationResult {
     const domain = email.split('@')[1]?.toLowerCase();
 
-    const commonDomains = [
-        'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
-        'icloud.com', 'protonmail.com', 'aol.com'
-    ];
-
     const commonTypos: { [key: string]: string } = {
         'gmai.com': 'gmail.com',
         'gmial.com': 'gmail.com',

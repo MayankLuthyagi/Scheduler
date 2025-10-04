@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import nodemailer from 'nodemailer';
 import { ObjectId } from 'mongodb';
@@ -12,10 +12,10 @@ interface EmailError {
 }
 
 // Function to categorize email sending errors
-function categorizeEmailError(error: any): EmailError {
+function categorizeEmailError(error: Error | { message?: string; code?: string; responseCode?: number }): EmailError {
     const errorMessage = error.message || error.toString();
-    const errorCode = error.code;
-    const responseCode = error.responseCode;
+    const errorCode = 'code' in error ? error.code : undefined;
+    const responseCode = 'responseCode' in error ? error.responseCode : undefined;
 
     // Authentication errors
     if (errorMessage.includes('Invalid login') ||
@@ -110,7 +110,7 @@ const getAllEmails = async () => {
 };
 
 
-export async function SendMail(request: NextRequest) {
+export async function SendMail() {
     try {
         const campaigns = await getAllCampaigns();
         const allSenderEmails = await getAllEmails();
@@ -195,7 +195,7 @@ export async function SendMail(request: NextRequest) {
 
                     if (recipientEmailsForBatch.length === 0) continue;
 
-                    const mailOptions: any = {
+                    const mailOptions: nodemailer.SendMailOptions = {
                         from: authEmail.name ? `${authEmail.name} <${authEmail.email}>` : authEmail.email,
                         to: campaign.toEmail, // The primary recipient
                         cc: campaign.sendMethod === "cc" ? recipientEmailsForBatch : undefined,
@@ -206,7 +206,7 @@ export async function SendMail(request: NextRequest) {
 
                     // Handle attachments from MongoDB
                     if (campaign.attachments && campaign.attachments.length > 0) {
-                        mailOptions.attachments = campaign.attachments.map((attachment: any) => ({
+                        mailOptions.attachments = campaign.attachments.map((attachment: { filename: string; content: string; contentType: string }) => ({
                             filename: attachment.filename,
                             content: Buffer.from(attachment.content, 'base64'),
                             contentType: attachment.contentType,
@@ -227,8 +227,8 @@ export async function SendMail(request: NextRequest) {
                         }));
                         await db.collection('EmailLog').insertMany(successLogs);
 
-                    } catch (emailError: any) {
-                        const categorizedError = categorizeEmailError(emailError);
+                    } catch (emailError: unknown) {
+                        const categorizedError = categorizeEmailError(emailError as Error);
                         console.error(`Failed to send batch from ${authEmail.email}: [${categorizedError.category.toUpperCase()}] ${categorizedError.reason}`);
 
                         // Log failure for every recipient in the batch
@@ -261,7 +261,7 @@ export async function SendMail(request: NextRequest) {
                         const trackingPixelUrl = `${process.env.YOUR_DOMAIN}/api/track?logId=${logId.toHexString()}`;
                         const emailBodyWithPixel = `${campaign.emailBody}<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;"/>`;
 
-                        const mailOptions: any = {
+                        const mailOptions: nodemailer.SendMailOptions = {
                             from: authEmail.name ? `${authEmail.name} <${authEmail.email}>` : authEmail.email,
                             to: recipientEmail,
                             subject: campaign.emailSubject,
@@ -270,7 +270,7 @@ export async function SendMail(request: NextRequest) {
 
                         // Handle attachments from MongoDB
                         if (campaign.attachments && campaign.attachments.length > 0) {
-                            mailOptions.attachments = campaign.attachments.map((attachment: any) => ({
+                            mailOptions.attachments = campaign.attachments.map((attachment: { filename: string; content: string; contentType: string }) => ({
                                 filename: attachment.filename,
                                 content: Buffer.from(attachment.content, 'base64'),
                                 contentType: attachment.contentType,
@@ -286,8 +286,8 @@ export async function SendMail(request: NextRequest) {
                                 senderEmail: authEmail.email,
                                 sentAt: new Date(),
                             });
-                        } catch (emailError: any) {
-                            const categorizedError = categorizeEmailError(emailError);
+                        } catch (emailError: unknown) {
+                            const categorizedError = categorizeEmailError(emailError as Error);
                             await db.collection('EmailLog').insertOne({
                                 _id: logId,
                                 status: 'failed',

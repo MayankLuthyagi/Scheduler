@@ -18,8 +18,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState([]);
     const [emails, setEmails] = useState<Email[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [adminUser, setAdminUser] = useState<any>(null);
+    const [adminUser, setAdminUser] = useState<{ username: string; role: string } | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -52,10 +51,9 @@ export default function AdminPage() {
             if (data.success) {
                 setUsers(data.users);
             } else {
-                setError(data.error || 'Failed to fetch users');
+                console.log(data.error || 'Failed to fetch users');
             }
         } catch (err) {
-            setError('Failed to fetch users');
             console.error('Error fetching users:', err);
         } finally {
             setLoading(false);
@@ -74,10 +72,9 @@ export default function AdminPage() {
             if (data.success) {
                 setEmails(data.emails);
             } else {
-                setError(data.error || 'Failed to fetch emails');
+                console.log(data.error || 'Failed to fetch emails');
             }
         } catch (err) {
-            setError('Failed to fetch emails');
             console.error('Error fetching emails:', err);
         } finally {
             setLoading(false);
