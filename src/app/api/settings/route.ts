@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
+import { SiteSettings } from '@/types/settings';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
         const themeMode = formData.get('themeMode') as string;
         const textLogoFile = formData.get('textLogo') as File | null;
         const logoFile = formData.get('logo') as File | null;
-        
+
         // Handle featureAllowed toggles
         const featureAllowed = {
             emailLogs: formData.get('emailLogs') === 'true',
@@ -78,9 +79,9 @@ export async function POST(request: NextRequest) {
 
         const existingSettings = await settingsCollection.findOne({});
 
-        const updatedSettings: any = {
+        const updatedSettings: Partial<SiteSettings> = {
             themeColor,
-            themeMode,
+            themeMode: themeMode as 'light' | 'dark',
             featureAllowed, // Add feature toggles to settings
             updatedAt: new Date()
         };

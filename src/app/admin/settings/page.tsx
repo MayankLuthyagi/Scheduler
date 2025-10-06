@@ -199,7 +199,7 @@ export default function AdminSettingsPage() {
                             <div className="flex items-center space-x-4">
                                 <div className="flex-1">
                                     <label htmlFor="themeColor" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
-                                        Choose your site's primary color
+                                        Choose your site&apos;s primary color
                                     </label>
                                     <div className="flex items-center space-x-3">
                                         <input type="color" id="themeColor" value={formData.themeColor} onChange={handleColorChange} className="w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer" />

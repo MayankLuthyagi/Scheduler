@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import DashboardLayout from '@/components/admin/DashboardLayout';
-import RecentActivity from '@/components/admin/RecentActivity';
 import SkeletonLoader from '@/components/admin/SkeletonLoader';
 import StatCard from '@/components/admin/StatCard';
 import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
-import { FiUsers, FiMail, FiFileText, FiSettings, FiCheckCircle, FiEye, FiX, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertTriangle, FiAlertCircle, FiEdit, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiUsers, FiMail, FiCheckCircle, FiEye, FiX, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertTriangle, FiAlertCircle, FiEdit, FiTrash2, FiPlus } from 'react-icons/fi';
 import { EmailLog } from '@/types/emailLog';
 interface AuthUser {
     _id: string;
@@ -180,9 +178,8 @@ export default function AdminDashboardPage() {
     const [emails, setEmails] = useState<AuthEmail[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeSection, setActiveSection] = useState<'email-logs' | 'users' | 'emails'>('email-logs');
-    const { settings, isLoading } = useTheme();
+    const { settings } = useTheme();
     const emailLogsAllowed = useFeatureAllowed('emailLogs');
-    const router = useRouter();
     const { stats, isLoading: statsLoading } = useDashboardStats();
     const { logs, loading: logsLoading, error: logsError, filter, setFilter, searchTerm, setSearchTerm, page, setPage, totalPages, refresh: refreshLogs, markAsBounced, deleteAllLogs } = useEmailLogs();
 
@@ -568,7 +565,7 @@ export default function AdminDashboardPage() {
                                     </div>
 
                                     {/* Pagination */}
-                                    {totalPages > 1 && <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} themeColor={settings.themeColor} />}
+                                    {totalPages > 1 && <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />}
                                 </>
                             )}
 
@@ -828,10 +825,9 @@ interface PaginationProps {
     currentPage: number;
     totalPages: number;
     onPageChange: (page: number) => void;
-    themeColor: string;
 }
 
-const Pagination = ({ currentPage, totalPages, onPageChange, themeColor }: PaginationProps) => (
+const Pagination = ({ currentPage, totalPages, onPageChange }: PaginationProps) => (
     <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm">
         <span className="text-gray-600 dark:text-gray-400">Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
         <div className="flex gap-2">
@@ -1055,8 +1051,10 @@ interface UserModalProps {
 }
 
 const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUser }: UserModalProps) => {
+    const { settings } = useTheme();
+
     if (!isOpen) return null;
-    const { settings, isLoading } = useTheme();
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSubmit();
@@ -1135,8 +1133,10 @@ interface EmailModalProps {
 }
 
 const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editingEmail }: EmailModalProps) => {
+    const { settings } = useTheme();
+
     if (!isOpen) return null;
-    const { settings, isLoading } = useTheme();
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSubmit();
@@ -1262,7 +1262,7 @@ const DeleteConfirmModal = ({ deleteConfirm, onClose, onConfirm }: DeleteConfirm
                             Are you sure?
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                            You are about to delete the {deleteConfirm.type} "{deleteConfirm.email}". This action cannot be undone.
+                            You are about to delete the {deleteConfirm.type} &ldquo;{deleteConfirm.email}&rdquo;. This action cannot be undone.
                         </p>
                     </div>
                     <div className="mt-6 flex justify-center gap-4">
