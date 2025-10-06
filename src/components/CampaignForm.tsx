@@ -7,7 +7,7 @@ import { FiX, FiUploadCloud, FiTrash2, FiLoader, FiBold, FiItalic, FiCode } from
 import { createEditor, Descendant, Editor, Text } from 'slate';
 import { Slate, Editable, withReact, useSlate, ReactEditor } from 'slate-react';
 import { withHistory } from 'slate-history';
-
+import { useTheme } from '@/contexts/ThemeContext';
 // --- Slate.js Type Definitions ---
 type CustomElement = { type: 'paragraph'; children: CustomText[] };
 type CustomText = { text: string; bold?: true; italic?: true; code?: true };
@@ -91,6 +91,7 @@ const deserializeHTMLToSlate = (html: string): Descendant[] => {
 
 const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon: React.ReactNode }) => {
     const editor = useSlate();
+    const { settings } = useTheme();
     const isMarkActive = (editor: Editor, format: string) => {
         const marks = Editor.marks(editor);
         return marks ? marks[format as keyof Omit<CustomText, 'text'>] === true : false;
@@ -107,7 +108,12 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
                     Editor.addMark(editor, format, true);
                 }
             }}
-            className={`px-2 py-1 border rounded hover:bg-gray-200 ${isMarkActive(editor, format) ? 'bg-blue-100 text-blue-700' : 'bg-white'}`}
+            className={`px-2 py-1 border rounded hover:bg-gray-200 ${
+                isMarkActive(editor, format) ? 'text-white' : 'bg-white'
+            }`}
+            style={{
+                backgroundColor: isMarkActive(editor, format) ? settings.themeColor : 'white'
+            }}
         >
             {icon}
         </button>
@@ -125,16 +131,16 @@ const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onCh
         return <span {...props.attributes}>{children}</span>;
     }, []);
 
-    const initialValue = useMemo(() => {
+    const editorValue = useMemo(() => {
         return value && value.length > 0 ? value : initialSlateValue;
     }, [value]);
 
     return (
         <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
             <Slate
-                key={editorKey}
+                key={`${editorKey}-${JSON.stringify(editorValue)}`}
                 editor={editor}
-                initialValue={initialValue}
+                initialValue={editorValue}
                 onValueChange={onChange}
             >
                 <div className="border-b p-2 flex gap-2 bg-gray-50">
@@ -196,6 +202,7 @@ type Tab = 'content' | 'scheduling' | 'sending';
 export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
     const { authEmails, isLoading: emailsLoading } = useAuthEmails(isOpen);
+    const { settings, isLoading: themeLoading } = useTheme();
 
     type SlateFormValues = Omit<CampaignFormData, 'emailBody'> & {
         emailBody: Descendant[];
@@ -271,7 +278,14 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         <button
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === tab 
+                    ? 'text-white' 
+                    : 'text-gray-600 hover:bg-gray-200'
+            }`}
+            style={{
+                backgroundColor: activeTab === tab ? settings.themeColor : 'transparent'
+            }}
         >
             {label}
         </button>
@@ -443,14 +457,29 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                             control={control}
                             render={({ field }) => (
                                 <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input type="checkbox" checked={field.value} onChange={field.onChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                                    <input 
+                                        type="checkbox" 
+                                        checked={field.value} 
+                                        onChange={field.onChange} 
+                                        className="h-4 w-4 border-gray-300 rounded focus:ring-2"
+                                        style={{
+                                            accentColor: settings.themeColor
+                                        }}
+                                    />
                                     <span className="text-sm font-medium text-gray-700">Campaign is Active</span>
                                 </label>
                             )}
                         />
                         {activeTab === 'sending' && (<div className="flex space-x-4">
                             <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer">Cancel</button>
-                            <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 cursor-pointer">
+                            <button 
+                                type="submit" 
+                                disabled={isSubmitting} 
+                                className="px-5 py-2.5 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:bg-gray-400 cursor-pointer"
+                                style={{
+                                    backgroundColor: isSubmitting ? '#9CA3AF' : settings.themeColor
+                                }}
+                            >
                                 {isSubmitting && <FiLoader className="animate-spin mr-2" />}
                                 {isSubmitting ? 'Saving...' : (editCampaign ? 'Update Campaign' : 'Create Campaign')}
                             </button>
@@ -513,7 +542,7 @@ const FormSelect = ({ label, name, register, required, options, ...props }: Form
 );
 
 const ToggleButtonGroup = ({ label, options, value, onChange }: { label: string; options: string[]; value: string[]; onChange: (newValue: string[]) => void; }) => {
-    // ... (unchanged)
+    const { settings } = useTheme();
     const handleSelect = (option: string) => {
         const newValue = value.includes(option) ? value.filter(item => item !== option) : [...value, option];
         onChange(newValue);
@@ -527,7 +556,15 @@ const ToggleButtonGroup = ({ label, options, value, onChange }: { label: string;
                         key={option}
                         type="button"
                         onClick={() => handleSelect(option)}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${value.includes(option) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                            value.includes(option) 
+                                ? 'text-white' 
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                        }`}
+                        style={{
+                            backgroundColor: value.includes(option) ? settings.themeColor : 'white',
+                            borderColor: value.includes(option) ? settings.themeColor : undefined
+                        }}
                     >
                         {option}
                     </button>
