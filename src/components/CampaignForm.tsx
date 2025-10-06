@@ -108,9 +108,8 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
                     Editor.addMark(editor, format, true);
                 }
             }}
-            className={`px-2 py-1 border rounded hover:bg-gray-200 ${
-                isMarkActive(editor, format) ? 'text-white' : 'bg-white'
-            }`}
+            className={`px-2 py-1 border rounded hover:bg-gray-200 ${isMarkActive(editor, format) ? 'text-white' : 'bg-white'
+                }`}
             style={{
                 backgroundColor: isMarkActive(editor, format) ? settings.themeColor : 'white'
             }}
@@ -278,11 +277,10 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         <button
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === tab 
-                    ? 'text-white' 
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab
+                    ? 'text-white'
                     : 'text-gray-600 hover:bg-gray-200'
-            }`}
+                }`}
             style={{
                 backgroundColor: activeTab === tab ? settings.themeColor : 'transparent'
             }}
@@ -457,10 +455,10 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                             control={control}
                             render={({ field }) => (
                                 <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={field.value} 
-                                        onChange={field.onChange} 
+                                    <input
+                                        type="checkbox"
+                                        checked={field.value}
+                                        onChange={field.onChange}
                                         className="h-4 w-4 border-gray-300 rounded focus:ring-2"
                                         style={{
                                             accentColor: settings.themeColor
@@ -472,9 +470,9 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                         />
                         {activeTab === 'sending' && (<div className="flex space-x-4">
                             <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer">Cancel</button>
-                            <button 
-                                type="submit" 
-                                disabled={isSubmitting} 
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
                                 className="px-5 py-2.5 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:bg-gray-400 cursor-pointer"
                                 style={{
                                     backgroundColor: isSubmitting ? '#9CA3AF' : settings.themeColor
@@ -556,11 +554,10 @@ const ToggleButtonGroup = ({ label, options, value, onChange }: { label: string;
                         key={option}
                         type="button"
                         onClick={() => handleSelect(option)}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                            value.includes(option) 
-                                ? 'text-white' 
+                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${value.includes(option)
+                                ? 'text-white'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                        }`}
+                            }`}
                         style={{
                             backgroundColor: value.includes(option) ? settings.themeColor : 'white',
                             borderColor: value.includes(option) ? settings.themeColor : undefined
