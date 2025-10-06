@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AdminLoginPage() {
     const [username, setUsername] = useState('');
@@ -10,6 +11,15 @@ export default function AdminLoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+    const { settings, isLoading: themeLoading } = useTheme();
+
+    if (themeLoading) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+            </div>
+        );
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,7 +89,8 @@ export default function AdminLoginPage() {
                             required
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                            style={{ borderColor: settings.themeColor }}
+                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50"
                             placeholder="Enter username"
                         />
                     </div>
@@ -94,7 +105,8 @@ export default function AdminLoginPage() {
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                            style={{ borderColor: settings.themeColor }}
+                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50"
                             placeholder="Enter password"
                         />
                     </div>
@@ -102,7 +114,8 @@ export default function AdminLoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                        style={{ backgroundColor: settings.themeColor }}
+                        className="w-full flex items-center justify-center gap-3 py-3 px-4 text-white rounded-lg shadow-md transition-transform transform hover:scale-105 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         {isLoading ? (
                             <>
@@ -120,7 +133,7 @@ export default function AdminLoginPage() {
 
                 <div className="mt-6 text-center">
                     <Link
-                        href="/initial"
+                        href="/"
                         className="text-sm text-gray-600 hover:text-gray-900 transition duration-200"
                     >
                         ← Back to main page

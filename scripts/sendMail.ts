@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import nodemailer from "nodemailer";
 import { ObjectId } from "mongodb";
 import { validateEmail } from "@/lib/emailValidation";
+import type { SiteSettings } from "@/types/settings";
 import "dotenv/config";
 
 // Enhanced error categorization
@@ -100,6 +101,20 @@ function categorizeEmailError(error: any): EmailError {
         reason: 'Unknown email sending error',
         originalError: errorMessage
     };
+}
+
+// Helper function to check if a feature is allowed from database settings
+async function isFeatureAllowed(db: any, feature: keyof SiteSettings['featureAllowed']): Promise<boolean> {
+    try {
+        const settings = await db.collection("Settings").findOne({});
+        if (!settings || !settings.featureAllowed) {
+            return false;
+        }
+        return settings.featureAllowed[feature] || false;
+    } catch (error) {
+        console.log(`Warning: Could not check feature '${feature}' settings:`, error);
+        return false; // Default to false if settings can't be retrieved
+    }
 }
 
 (async () => {
@@ -227,7 +242,7 @@ function categorizeEmailError(error: any): EmailError {
                     }
 
                     // Log invalid emails
-                    if (invalidEmails.length > 0) {
+                    if (await isFeatureAllowed(db, 'emailLogs') && invalidEmails.length > 0) {
                         const invalidLogs = invalidEmails.map((invalid) => ({
                             campaignId: campaign.campaignId,
                             recipientEmail: invalid.email,
@@ -253,6 +268,7 @@ function categorizeEmailError(error: any): EmailError {
                         bcc:
                             campaign.sendMethod === "bcc" ? recipientEmailsForBatch : undefined,
                         subject: campaign.emailSubject,
+                        replyTo: campaign.replyToEmail === "" ? authEmail.email : campaign.replyToEmail,
                         html: campaign.emailBody,
                     };
 
@@ -265,22 +281,22 @@ function categorizeEmailError(error: any): EmailError {
                             })
                         );
                     }
-
                     try {
                         await transporter.sendMail(mailOptions);
                         console.log(
                             `✅ Sent batch from ${authEmail.email} to ${recipientEmailsForBatch.length} recipients.`
                         );
-
-                        const successLogs = recipientEmailsForBatch.map((email) => ({
-                            campaignId: campaign.campaignId,
-                            recipientEmail: email,
-                            senderEmail: authEmail.email,
-                            sendMethod: campaign.sendMethod,
-                            status: "sent",
-                            sentAt: new Date(),
-                        }));
-                        await db.collection("EmailLog").insertMany(successLogs);
+                        if (await isFeatureAllowed(db, 'emailLogs')) {
+                            const successLogs = recipientEmailsForBatch.map((email) => ({
+                                campaignId: campaign.campaignId,
+                                recipientEmail: email,
+                                senderEmail: authEmail.email,
+                                sendMethod: campaign.sendMethod,
+                                status: "sent",
+                                sentAt: new Date(),
+                            }));
+                            await db.collection("EmailLog").insertMany(successLogs);
+                        }
                     } catch (emailError: any) {
                         console.error(
                             `❌ Failed batch from ${authEmail.email}:`,
@@ -301,8 +317,8 @@ function categorizeEmailError(error: any): EmailError {
 
                         // Validate email before sending
                         const validation = await validateEmail(recipientEmail.trim());
-                        if (!validation.isValid) {
-                            console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
+                        console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
+                        if (await isFeatureAllowed(db, 'emailLogs') && !validation.isValid) {
                             await db.collection("EmailLog").insertOne({
                                 _id: logId,
                                 status: "failed",
@@ -333,6 +349,7 @@ function categorizeEmailError(error: any): EmailError {
                                 : authEmail.email,
                             to: recipientEmail,
                             subject: campaign.emailSubject,
+                            replyTo: campaign.replyToEmail === "" ? authEmail.email : campaign.replyToEmail,
                             html: emailBodyToSend,
                         };
 
@@ -349,31 +366,34 @@ function categorizeEmailError(error: any): EmailError {
                         try {
                             await transporter.sendMail(mailOptions);
                             console.log(`  - ✅ Sent to ${recipientEmail.trim()}`);
-                            await db.collection("EmailLog").insertOne({
-                                _id: logId,
-                                status: "sent",
-                                campaignId: campaign.campaignId,
-                                recipientEmail: recipientEmail.trim(),
-                                senderEmail: authEmail.email,
-                                sendMethod: campaign.sendMethod,
-                                sentAt: new Date(),
-                            });
+                            if (await isFeatureAllowed(db, 'emailLogs')) {
+                                await db.collection("EmailLog").insertOne({
+                                    _id: logId,
+                                    status: "sent",
+                                    campaignId: campaign.campaignId,
+                                    recipientEmail: recipientEmail.trim(),
+                                    senderEmail: authEmail.email,
+                                    sendMethod: campaign.sendMethod,
+                                    sentAt: new Date(),
+                                });
+                            }
                         } catch (emailError: any) {
                             const categorizedError = categorizeEmailError(emailError);
                             console.log(`  - ❌ Failed to send to ${recipientEmail.trim()}: [${categorizedError.category.toUpperCase()}] ${categorizedError.reason}`);
-
-                            await db.collection("EmailLog").insertOne({
-                                _id: logId,
-                                status: "failed",
-                                failureReason: categorizedError.reason,
-                                failureCategory: categorizedError.category,
-                                originalError: categorizedError.originalError,
-                                campaignId: campaign.campaignId,
-                                recipientEmail: recipientEmail.trim(),
-                                senderEmail: authEmail.email,
-                                sendMethod: campaign.sendMethod,
-                                sentAt: new Date(),
-                            });
+                            if (await isFeatureAllowed(db, 'emailLogs')) {
+                                await db.collection("EmailLog").insertOne({
+                                    _id: logId,
+                                    status: "failed",
+                                    failureReason: categorizedError.reason,
+                                    failureCategory: categorizedError.category,
+                                    originalError: categorizedError.originalError,
+                                    campaignId: campaign.campaignId,
+                                    recipientEmail: recipientEmail.trim(),
+                                    senderEmail: authEmail.email,
+                                    sendMethod: campaign.sendMethod,
+                                    sentAt: new Date(),
+                                });
+                            }
                         }
                     }
                 }

@@ -1,26 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
+import { Collection } from 'mongodb';
 
 export async function GET(request: NextRequest) {
     try {
+        const { db } = await connectToDatabase();
+        const collection: Collection = db.collection('EmailLog');
+
         const { searchParams } = new URL(request.url);
-        const today = searchParams.get('today');
-        if (today) {
+        
+        // --- 1. Get All Query Parameters ---
+        const status = searchParams.get('status');
+        const search = searchParams.get('search');
+        const page = parseInt(searchParams.get('page') || '1', 10);
+        const limit = parseInt(searchParams.get('limit') || '20', 10);
+        const skip = (page - 1) * limit;
+
+        // --- 2. Build a Dynamic MongoDB Query ---
+        const query: any = {};
+
+        // Handle the 'status' filter
+        if (status && status !== 'today') {
+            query.status = status;
             const start = new Date();
             start.setHours(0, 0, 0, 0);
             const end = new Date();
             end.setHours(23, 59, 59, 999);
-            const { db } = await connectToDatabase();
-            const emailLogs = await db.collection('EmailLog').find({
-                sentAt: { $gte: start, $lte: end }
-            }).toArray();
-            return NextResponse.json(emailLogs);
+            query.sentAt = { $gte: start, $lte: end };
         }
-        const { db } = await connectToDatabase();
-        const emailLogs = await db.collection('EmailLog').find({}).toArray();
-        return NextResponse.json(emailLogs);
-    } catch (error) {
+        
+        // Handle the special 'today' filter
+        if (status === 'today') {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            end.setHours(23, 59, 59, 999);
+            query.sentAt = { $gte: start, $lte: end };
+        }
+
+        // Handle the 'search' term
+        if (search) {
+            query.$or = [
+                { recipientEmail: { $regex: search, $options: 'i' } },
+                { senderEmail: { $regex: search, $options: 'i' } },
+                { campaignId: { $regex: search, $options: 'i' } },
+            ];
+        }
+
+        // --- 3. Execute Database Queries ---
+        // We run two queries at the same time for efficiency:
+        // - One to get the actual data for the current page.
+        // - One to count the total number of documents that match the filter.
+        const [logs, totalLogs] = await Promise.all([
+            collection
+                .find(query)
+                .sort({ sentAt: -1 }) // Show the newest logs first
+                .skip(skip)
+                .limit(limit)
+                .toArray(),
+            collection.countDocuments(query),
+        ]);
+        
+        // --- 4. Calculate Total Pages for Pagination ---
+        const totalPages = Math.ceil(totalLogs / limit);
+
+        // --- 5. Return Data in the Correct Format ---
+        return NextResponse.json({
+            logs,
+            totalPages,
+            currentPage: page,
+        });
+
+    } catch (error: any) {
         console.error('Error fetching email logs:', error);
-        return NextResponse.error();
+        // Provide a more informative error response
+        return NextResponse.json({ error: 'An internal server error occurred.', details: error.message }, { status: 500 });
     }
 }

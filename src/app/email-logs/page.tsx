@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { HiArrowLeft, HiRefresh, HiEye, HiX } from "react-icons/hi";
+import { HiArrowLeft, HiRefresh, HiEye, HiX, HiChevronLeft, HiChevronRight, HiExclamation } from "react-icons/hi";
 
+// --- Types (from your original code) ---
 interface EmailLog {
     _id: string;
     campaignId: string;
@@ -15,383 +16,311 @@ interface EmailLog {
     openedAt?: string;
     bouncedAt?: string;
     failureReason?: string;
-    failureCategory?: 'validation' | 'authentication' | 'rate_limit' | 'network' | 'recipient' | 'attachment' | 'configuration' | 'unknown';
+    failureCategory?: string;
     bounceReason?: string;
-    bounceCategory?: 'validation' | 'recipient';
+    bounceCategory?: string;
     originalError?: string;
 }
 
-export default function EmailLogsPage() {
-    const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
+type LogFilter = 'all' | 'today' | 'failed' | 'sent' | 'opened' | 'bounced';
+
+// --- Custom Hook for Data & Logic ---
+const useEmailLogs = () => {
+    const [logs, setLogs] = useState<EmailLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [filter, setFilter] = useState<'all' | 'today' | 'failed' | 'sent' | 'opened' | 'bounced'>('today');
+    
+    // State for filtering and pagination
+    const [filter, setFilter] = useState<LogFilter>('today');
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
-    const [markingBounced, setMarkingBounced] = useState(false);
-
-    const fetchEmailLogs = useCallback(async () => {
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    
+    const fetchLogs = useCallback(async (currentFilter: LogFilter, currentSearch: string, currentPage: number) => {
+        setLoading(true);
+        setError('');
         try {
-            setLoading(true);
-            const queryParam = filter === 'today' ? '?today=true' : '';
-            const response = await fetch(`/api/emailLog${queryParam}`);
+            // Construct URL with server-side filtering parameters
+            const params = new URLSearchParams();
+            if (currentFilter !== 'all') {
+                params.append('status', currentFilter);
+            }
+            if (currentSearch) {
+                params.append('search', currentSearch);
+            }
+            params.append('page', String(currentPage));
+            params.append('limit', '20'); // Example: 20 logs per page
+
+            const response = await fetch(`/api/emailLog?${params.toString()}`);
             const data = await response.json();
 
-            if (Array.isArray(data)) {
-                let filteredData = data;
-
-                // Apply status filter
-                if (filter === 'failed') {
-                    filteredData = data.filter((log: EmailLog) => log.status === 'failed');
-                } else if (filter === 'sent') {
-                    filteredData = data.filter((log: EmailLog) => log.status === 'sent');
-                } else if (filter === 'opened') {
-                    filteredData = data.filter((log: EmailLog) => log.status === 'opened');
-                } else if (filter === 'bounced') {
-                    filteredData = data.filter((log: EmailLog) => log.status === 'bounced');
-                }
-
-                setEmailLogs(filteredData);
+            if (response.ok) {
+                setLogs(data.logs || []);
+                setTotalPages(data.totalPages || 1);
             } else {
-                setError('Failed to fetch email logs');
+                throw new Error(data.error || 'Failed to fetch logs.');
             }
-        } catch (err) {
-            setError('Failed to fetch email logs');
-            console.error('Error fetching email logs:', err);
+        } catch (err: any) {
+            setError(err.message);
+            setLogs([]);
         } finally {
             setLoading(false);
         }
-    }, [filter]);
+    }, []);
 
+    // Effect to refetch when filters change
     useEffect(() => {
-        fetchEmailLogs();
-    }, [fetchEmailLogs]);
+        // Debounce search term to avoid excessive API calls
+        const handler = setTimeout(() => {
+            fetchLogs(filter, searchTerm, page);
+        }, 300); // 300ms delay
 
-    const filteredLogs = emailLogs.filter(log =>
-        log.recipientEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.senderEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.campaignId.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const getStatusBadge = (status: string) => {
-        const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
-        switch (status) {
-            case 'sent':
-                return `${baseClasses} bg-green-100 text-green-800`;
-            case 'failed':
-                return `${baseClasses} bg-red-100 text-red-800`;
-            case 'opened':
-                return `${baseClasses} bg-blue-100 text-blue-800`;
-            case 'bounced':
-                return `${baseClasses} bg-yellow-100 text-yellow-800`;
-            default:
-                return `${baseClasses} bg-gray-100 text-gray-800`;
-        }
-    };
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'sent':
-                return '✅';
-            case 'failed':
-                return '❌';
-            case 'opened':
-                return '👁️';
-            case 'bounced':
-                return '⚠️';
-            default:
-                return '❓';
-        }
-    };
-
-    const markAsBounced = async (emailLog: EmailLog, reason: string) => {
+        return () => clearTimeout(handler);
+    }, [filter, searchTerm, page, fetchLogs]);
+    
+    const markAsBounced = async (log: EmailLog, reason: string) => {
         try {
-            setMarkingBounced(true);
             const response = await fetch('/api/bounce', {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    recipientEmail: emailLog.recipientEmail,
-                    reason: reason
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recipientEmail: log.recipientEmail, reason }),
             });
-
             const data = await response.json();
-            if (data.success) {
-                // Refresh the email logs
-                fetchEmailLogs();
-                setSelectedLog(null);
-                alert('Email marked as bounced successfully');
-            } else {
-                alert(`Failed to mark email as bounced: ${data.error}`);
-            }
-        } catch (error) {
-            console.error('Error marking email as bounced:', error);
-            alert('Failed to mark email as bounced');
-        } finally {
-            setMarkingBounced(false);
+            if (!response.ok) throw new Error(data.error || 'API error');
+            fetchLogs(filter, searchTerm, page); // Refresh logs on success
+            return { success: true };
+        } catch (err: any) {
+            return { success: false, error: err.message };
         }
+    };
+
+    return {
+        logs, loading, error,
+        filter, setFilter,
+        searchTerm, setSearchTerm,
+        page, setPage, totalPages,
+        refresh: () => fetchLogs(filter, searchTerm, page),
+        markAsBounced,
+    };
+};
+
+
+// --- Main Page Component ---
+export default function EmailLogsPage() {
+    const { logs, loading, error, filter, setFilter, searchTerm, setSearchTerm, page, setPage, totalPages, refresh, markAsBounced } = useEmailLogs();
+    const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
+    const [isBounceModalOpen, setBounceModalOpen] = useState(false);
+
+    const handleOpenBounceModal = () => {
+        setBounceModalOpen(true);
+    };
+
+    const handleCloseBounceModal = () => {
+        setBounceModalOpen(false);
     };
 
     return (
         <>
-            <div className="min-h-screen bg-gray-100 p-6">
+            <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto">
-                    <div className="bg-white rounded-lg shadow-lg">
+                    <div className="bg-white rounded-lg shadow-md">
                         {/* Header */}
-                        <div className="border-b border-gray-200 px-6 py-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                    <Link
-                                        href="/dashboard"
-                                        className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-                                    >
-                                        <HiArrowLeft className="w-5 h-5 mr-2" />
-                                        Back to Admin
-                                    </Link>
-                                    <h1 className="text-2xl font-bold text-gray-900">Email Logs</h1>
-                                </div>
-                                <button
-                                    onClick={fetchEmailLogs}
-                                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    <HiRefresh className="w-4 h-4 mr-2" />
-                                    Refresh
-                                </button>
+                        <div className="border-b p-4 flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <Link href="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900 transition">
+                                    <HiArrowLeft className="w-5 h-5 mr-2" />
+                                    Dashboard
+                                </Link>
+                                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Email Logs</h1>
                             </div>
+                            <button onClick={refresh} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                                <HiRefresh className="w-4 h-4 mr-2" />
+                                Refresh
+                            </button>
                         </div>
 
                         {/* Filters and Search */}
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-                                <div className="flex space-x-2">
-                                    {['all', 'today', 'sent', 'failed', 'opened', 'bounced'].map((filterOption) => (
-                                        <button
-                                            key={filterOption}
-                                            onClick={() => setFilter(filterOption as 'all' | 'today' | 'sent' | 'failed' | 'opened' | 'bounced')}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === filterOption
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-                                        </button>
+                        <div className="p-4 border-b">
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <div className="flex-shrink-0 flex flex-wrap gap-2">
+                                    {['all', 'today', 'sent', 'failed', 'opened', 'bounced'].map(f => (
+                                        <FilterButton key={f} active={filter === f} onClick={() => setFilter(f as LogFilter)}>
+                                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                                        </FilterButton>
                                     ))}
                                 </div>
-                                <div className="flex-1 max-w-md">
-                                    <input
-                                        type="text"
-                                        placeholder="Search by email..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Search by recipient, sender, or campaign ID..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full md:max-w-xs px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-6">
-                            {loading ? (
-                                <div className="flex justify-center py-8">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                </div>
-                            ) : error ? (
-                                <div className="text-center py-8">
-                                    <p className="text-red-600">{error}</p>
-                                </div>
-                            ) : filteredLogs.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <p className="text-gray-600">No email logs found</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Status
-                                                </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Recipient
-                                                </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Sender
-                                                </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Sent At
-                                                </th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Actions
-                                                </th>
+                        {/* Content Table */}
+                        <div className="overflow-x-auto">
+                            {loading && <p className="text-center p-8">Loading...</p>}
+                            {error && <p className="text-center p-8 text-red-600">{error}</p>}
+                            {!loading && !error && logs.length === 0 && <p className="text-center p-8 text-gray-600">No logs found for this filter.</p>}
+                            {!loading && !error && logs.length > 0 && (
+                                <table className="min-w-full divide-y">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium uppercase">Status</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium uppercase">Recipient</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium uppercase">Sender</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium uppercase">Sent At</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y">
+                                        {logs.map((log) => (
+                                            <tr key={log._id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={log.status} /></td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm">{log.recipientEmail}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.senderEmail}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.sentAt).toLocaleString()}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <button onClick={() => setSelectedLog(log)} className="text-blue-600 hover:text-blue-900"><HiEye /></button>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {filteredLogs.map((log) => (
-                                                <tr key={log._id} className="hover:bg-gray-50">
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="flex items-center">
-                                                            <span className="mr-2">{getStatusIcon(log.status)}</span>
-                                                            <span className={getStatusBadge(log.status)}>
-                                                                {log.status}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-900">{log.recipientEmail}</div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-600">{log.senderEmail}</div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-600">
-                                                            {new Date(log.sentAt).toLocaleString()}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <button
-                                                            onClick={() => setSelectedLog(log)}
-                                                            className="text-blue-600 hover:text-blue-900 transition-colors"
-                                                        >
-                                                            <HiEye className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
+                        
+                        {/* Pagination */}
+                        {totalPages > 1 && <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />}
                     </div>
                 </div>
-
-                {/* Detail Modal */}
-                {selectedLog && (
-                    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                        <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                            <div className="mt-3">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-medium text-gray-900">Email Log Details</h3>
-                                    <button
-                                        onClick={() => setSelectedLog(null)}
-                                        className="text-gray-400 hover:text-gray-600"
-                                    >
-                                        <HiX className="w-6 h-6" />
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Status</label>
-                                        <div className="mt-1 flex items-center">
-                                            <span className="mr-2">{getStatusIcon(selectedLog.status)}</span>
-                                            <span className={getStatusBadge(selectedLog.status)}>
-                                                {selectedLog.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Recipient Email</label>
-                                        <p className="mt-1 text-sm text-gray-900">{selectedLog.recipientEmail}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Sender Email</label>
-                                        <p className="mt-1 text-sm text-gray-900">{selectedLog.senderEmail}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Campaign ID</label>
-                                        <p className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.campaignId}</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Send Method</label>
-                                        <p className="mt-1 text-sm text-gray-900 capitalize">
-                                            {selectedLog.sendMethod}
-                                            {(selectedLog.sendMethod === 'cc' || selectedLog.sendMethod === 'bcc') && (
-                                                <span className="ml-2 text-xs text-gray-500">(No open tracking)</span>
-                                            )}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Sent At</label>
-                                        <p className="mt-1 text-sm text-gray-900">{new Date(selectedLog.sentAt).toLocaleString()}</p>
-                                    </div>
-                                    {selectedLog.openedAt && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Opened At</label>
-                                            <p className="mt-1 text-sm text-gray-900">{new Date(selectedLog.openedAt).toLocaleString()}</p>
-                                        </div>
-                                    )}
-                                    {selectedLog.failureReason && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                Failure Reason
-                                                {selectedLog.failureCategory && (
-                                                    <span className={`ml-2 px-2 py-1 text-xs rounded-full ${selectedLog.failureCategory === 'validation' ? 'bg-yellow-100 text-yellow-800' :
-                                                        selectedLog.failureCategory === 'authentication' ? 'bg-red-100 text-red-800' :
-                                                            selectedLog.failureCategory === 'rate_limit' ? 'bg-orange-100 text-orange-800' :
-                                                                selectedLog.failureCategory === 'network' ? 'bg-purple-100 text-purple-800' :
-                                                                    selectedLog.failureCategory === 'recipient' ? 'bg-blue-100 text-blue-800' :
-                                                                        selectedLog.failureCategory === 'attachment' ? 'bg-green-100 text-green-800' :
-                                                                            selectedLog.failureCategory === 'configuration' ? 'bg-pink-100 text-pink-800' :
-                                                                                'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {selectedLog.failureCategory}
-                                                    </span>
-                                                )}
-                                            </label>
-                                            <p className="mt-1 text-sm text-red-600">{selectedLog.failureReason}</p>
-                                            {selectedLog.originalError && selectedLog.originalError !== selectedLog.failureReason && (
-                                                <p className="mt-1 text-xs text-gray-500">Original: {selectedLog.originalError}</p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {selectedLog.bounceReason && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">
-                                                Bounce Reason
-                                                {selectedLog.bounceCategory && (
-                                                    <span className={`ml-2 px-2 py-1 text-xs rounded-full ${selectedLog.bounceCategory === 'validation' ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-blue-100 text-blue-800'
-                                                        }`}>
-                                                        {selectedLog.bounceCategory}
-                                                    </span>
-                                                )}
-                                            </label>
-                                            <p className="mt-1 text-sm text-yellow-600">{selectedLog.bounceReason}</p>
-                                        </div>
-                                    )}
-                                    {selectedLog.bouncedAt && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Bounced At</label>
-                                            <p className="mt-1 text-sm text-gray-900">{new Date(selectedLog.bouncedAt).toLocaleString()}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Action buttons for sent emails */}
-                                {selectedLog.status === 'sent' && (
-                                    <div className="mt-6 pt-4 border-t border-gray-200">
-                                        <button
-                                            onClick={() => {
-                                                const reason = prompt('Enter bounce reason:');
-                                                if (reason) {
-                                                    markAsBounced(selectedLog, reason);
-                                                }
-                                            }}
-                                            disabled={markingBounced}
-                                            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                                        >
-                                            {markingBounced ? 'Marking as Bounced...' : 'Mark as Bounced'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {/* Modals */}
+            {selectedLog && <DetailModal log={selectedLog} onClose={() => setSelectedLog(null)} onMarkAsBounced={handleOpenBounceModal} />}
+            {isBounceModalOpen && selectedLog && <BounceModal log={selectedLog} onClose={handleCloseBounceModal} onConfirm={markAsBounced} />}
         </>
     );
 }
+
+
+// --- Sub-components for UI ---
+const FilterButton = ({ active, onClick, children }: any) => (
+    <button
+        onClick={onClick}
+        className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+    >
+        {children}
+    </button>
+);
+
+const StatusBadge = ({ status }: { status: EmailLog['status'] }) => {
+    const styles: Record<string, string> = {
+        sent: "bg-green-100 text-green-800",
+        failed: "bg-red-100 text-red-800",
+        opened: "bg-blue-100 text-blue-800",
+        bounced: "bg-yellow-100 text-yellow-800",
+    };
+    return <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100'}`}>{status}</span>;
+};
+
+const Pagination = ({ currentPage, totalPages, onPageChange }: any) => (
+    <div className="p-4 border-t flex items-center justify-between text-sm">
+        <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+        <div className="flex gap-2">
+            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 border rounded disabled:opacity-50"><HiChevronLeft /></button>
+            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 border rounded disabled:opacity-50"><HiChevronRight /></button>
+        </div>
+    </div>
+);
+
+const DetailModal = ({ log, onClose, onMarkAsBounced }: any) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="text-lg font-medium">Log Details</h3>
+                <button onClick={onClose}><HiX /></button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+                <div className="grid grid-cols-3 gap-4">
+                    <span className="font-medium text-gray-600">Status</span>
+                    <span className="col-span-2"><StatusBadge status={log.status} /></span>
+                </div>
+                 <div className="grid grid-cols-3 gap-4">
+                    <span className="font-medium text-gray-600">Recipient</span>
+                    <span className="col-span-2">{log.recipientEmail}</span>
+                </div>
+                {/* Add other details similarly */}
+                 <div className="grid grid-cols-3 gap-4">
+                    <span className="font-medium text-gray-600">Sent At</span>
+                    <span className="col-span-2">{new Date(log.sentAt).toLocaleString()}</span>
+                </div>
+                {log.failureReason && (
+                     <div className="grid grid-cols-3 gap-4">
+                        <span className="font-medium text-gray-600">Failure Reason</span>
+                        <span className="col-span-2 text-red-600">{log.failureReason}</span>
+                    </div>
+                )}
+            </div>
+            {log.status === 'sent' && (
+                <div className="p-4 bg-gray-50 border-t">
+                    <button onClick={onMarkAsBounced} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-sm">
+                        Mark as Bounced
+                    </button>
+                </div>
+            )}
+        </div>
+    </div>
+);
+
+const BounceModal = ({ log, onClose, onConfirm }: any) => {
+    const [reason, setReason] = useState('');
+    const [isSubmitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async () => {
+        if (!reason) {
+            setError('Bounce reason is required.');
+            return;
+        }
+        setSubmitting(true);
+        setError('');
+        const result = await onConfirm(log, reason);
+        if (result.success) {
+            onClose();
+        } else {
+            setError(result.error);
+        }
+        setSubmitting(false);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div className="p-4 border-b flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Mark as Bounced</h3>
+                    <button onClick={onClose}><HiX /></button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <p className="text-sm">You are marking <strong>{log.recipientEmail}</strong> as bounced. This will add them to the suppression list.</p>
+                    <input
+                        type="text"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Enter bounce reason (e.g., 'Mailbox full')"
+                        className="w-full p-2 border rounded"
+                    />
+                    {error && <p className="text-sm text-red-600">{error}</p>}
+                </div>
+                 <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                    <button onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 bg-yellow-500 text-white rounded disabled:bg-yellow-300">
+                        {isSubmitting ? 'Submitting...' : 'Confirm Bounce'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};

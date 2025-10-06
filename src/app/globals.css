@@ -1,19 +1,13 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer theme {
   :root {
+    --theme-color: #3b82f6;
+    --background: #ffffff;
+    --foreground: #171717;
+  }
+
+  .dark {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
@@ -23,4 +17,88 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.transition-theme {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light mode (default) */
+html:not(.dark) body {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+html:not(.dark) .bg-white {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .bg-gray-100 {
+  background-color: #f3f4f6 !important;
+}
+
+html:not(.dark) .bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+html:not(.dark) .text-gray-900 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .text-gray-800 {
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .text-gray-600 {
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .border-gray-200 {
+  border-color: #e5e7eb !important;
+}
+
+html:not(.dark) .border-gray-700 {
+  border-color: #374151 !important;
+}
+
+/* Dark mode */
+.dark body {
+  background-color: #1f2937;
+  color: #f9fafb;
+}
+
+.dark .bg-white {
+  background-color: #374151 !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+.dark .bg-gray-800 {
+  background-color: #1f2937 !important;
+}
+
+.dark .text-gray-900 {
+  color: #f9fafb !important;
+}
+
+.dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.dark .text-gray-800 {
+  color: #d1d5db !important;
+}
+
+.dark .border-gray-200 {
+  border-color: #4b5563 !important;
+}
+
+.dark .border-gray-700 {
+  border-color: #6b7280 !important;
 }
