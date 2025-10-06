@@ -4,13 +4,20 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { CampaignFormData, Campaign } from '@/types/campaign';
 import { FiX, FiUploadCloud, FiTrash2, FiLoader, FiBold, FiItalic, FiCode } from 'react-icons/fi';
-import { createEditor, Descendant, Editor, Transforms, Text, Element as SlateElement } from 'slate';
+import { createEditor, Descendant, Editor, Text } from 'slate';
 import { Slate, Editable, withReact, useSlate, ReactEditor } from 'slate-react';
 import { withHistory } from 'slate-history';
 
 // --- Slate.js Type Definitions ---
 type CustomElement = { type: 'paragraph'; children: CustomText[] };
 type CustomText = { text: string; bold?: true; italic?: true; code?: true };
+
+interface RenderLeafProps {
+    attributes: Record<string, unknown>;
+    children: React.ReactNode;
+    leaf: CustomText;
+}
+
 declare module 'slate' {
     interface CustomTypes {
         Editor: ReactEditor & { type?: string };
@@ -94,7 +101,6 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
             type="button"
             onMouseDown={(event) => {
                 event.preventDefault();
-                const marks = Editor.marks(editor);
                 if (isMarkActive(editor, format)) {
                     Editor.removeMark(editor, format);
                 } else {
@@ -109,9 +115,9 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
 };
 
 const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onChange: (value: Descendant[]) => void; editorKey?: string; }) => {
-    const editor = useMemo(() => withHistory(withReact(createEditor())), [editorKey]);
+    const editor = useMemo(() => withHistory(withReact(createEditor())), []);
 
-    const renderLeaf = useCallback((props: any) => {
+    const renderLeaf = useCallback((props: RenderLeafProps) => {
         let children = props.children;
         if (props.leaf.bold) children = <strong>{children}</strong>;
         if (props.leaf.italic) children = <em>{children}</em>;
@@ -190,6 +196,7 @@ type Tab = 'content' | 'scheduling' | 'sending';
 export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
     const { authEmails, isLoading: emailsLoading } = useAuthEmails(isOpen);
+
     type SlateFormValues = Omit<CampaignFormData, 'emailBody'> & {
         emailBody: Descendant[];
     };
@@ -236,7 +243,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                 replyToEmail: editCampaign.replyToEmail || '',
                 sheetId: editCampaign.sheetId || '',
                 attachment: null, // Always null since we can't pre-populate file inputs
-                attachmentNote: (editCampaign as any).attachments?.[0]?.note || '',
+                attachmentNote: editCampaign.attachments?.[0]?.note || '',
                 isActive: editCampaign.isActive !== undefined ? editCampaign.isActive : true,
             };
             reset(processedEditData);
@@ -257,9 +264,6 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
 
     // ... (rest of the component is largely unchanged)
     const sendMethod = watch('sendMethod');
-    const commaId = watch('commaId');
-    const replyToEmail = watch('replyToEmail');
-    const toEmail = watch('toEmail');
 
     if (!isOpen) return null;
 
@@ -419,9 +423,9 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                                                     </div>
                                                 </div>
                                                 {watch('attachment') && <div className="mt-2 text-sm text-gray-700 flex items-center justify-between bg-gray-100 p-2 rounded"><span>{watch('attachment')?.name}</span> <button type="button" onClick={() => onChange(null)}><FiTrash2 className="text-red-500" /></button></div>}
-                                                {editCampaign && (editCampaign as any).attachments?.length > 0 && !watch('attachment') && (
+                                                {editCampaign && editCampaign.attachments?.length > 0 && !watch('attachment') && (
                                                     <div className="mt-2 text-sm text-blue-600">
-                                                        Existing attachment: {(editCampaign as any).attachments[0].filename}
+                                                        Existing attachment: {editCampaign.attachments[0].filename}
                                                     </div>
                                                 )}
                                             </div>
@@ -459,7 +463,29 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
 }
 
 // --- Reusable Form Field Components ---
-const FormInput = ({ label, name, register, required, type = "text", ...props }: any) => (
+interface FormInputProps {
+    label: string;
+    name: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    register: any;
+    required?: boolean;
+    type?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+}
+
+interface FormSelectProps {
+    label: string;
+    name: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    register: any;
+    required?: boolean;
+    options: { value: string; label: string }[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+}
+
+const FormInput = ({ label, name, register, required, type = "text", ...props }: FormInputProps) => (
     // ... (unchanged)
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -472,7 +498,7 @@ const FormInput = ({ label, name, register, required, type = "text", ...props }:
         />
     </div>
 );
-const FormSelect = ({ label, name, register, required, options, ...props }: any) => (
+const FormSelect = ({ label, name, register, required, options, ...props }: FormSelectProps) => (
     <div>
         <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <select
