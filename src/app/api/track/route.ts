@@ -18,18 +18,18 @@ export async function GET(request: NextRequest) {
         const realIp = request.headers.get('x-real-ip') || '';
 
         // Skip tracking if it looks like an automated request
+        // Conservative bot list: avoid matching common mail clients (Gmail/Outlook) to not miss real opens
         const automatedUserAgents = [
             'googlebot',
             'bingbot',
             'slurp',
             'crawler',
             'spider',
-            'proxy',
-            'scanner',
-            'gmail',
-            'outlook-com',
-            'mailchimp',
-            'constantcontact'
+            'headless',
+            'phantom',
+            'uptime',
+            'monitor',
+            'bot '
         ];
 
         const isAutomated = automatedUserAgents.some(bot =>
@@ -71,6 +71,26 @@ export async function GET(request: NextRequest) {
                         }
                     );
                 } else {
+                    // Still record a soft open for one-on-one within 10s as 'previewOpen'
+                    await db.collection('EmailLog').updateOne(
+                        {
+                            _id: new ObjectId(logId),
+                            status: { $ne: 'opened' },
+                            sendMethod: { $nin: ['cc', 'bcc'] }
+                        },
+                        {
+                            $set: {
+                                previewOpen: true,
+                                previewOpenedAt: new Date(),
+                                trackingData: {
+                                    userAgent,
+                                    referer,
+                                    ip: xForwardedFor || realIp,
+                                    timeDiff: timeDiff
+                                }
+                            }
+                        }
+                    );
                     console.log(`Potential automated open detected (too fast): ${logId}, Time diff: ${timeDiff}ms`);
                 }
             }

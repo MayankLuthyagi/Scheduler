@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 export async function GET() {
     try {
         const { db } = await connectToDatabase();
-        const settingsCollection = db.collection('settings');
+        const settingsCollection = db.collection('Settings');
 
         const settings = await settingsCollection.findOne({});
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         }
 
         const { db } = await connectToDatabase();
-        const settingsCollection = db.collection('settings');
+        const settingsCollection = db.collection('Settings');
 
         const existingSettings = await settingsCollection.findOne({});
 

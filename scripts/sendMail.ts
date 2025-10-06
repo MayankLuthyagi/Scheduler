@@ -345,7 +345,8 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                         // Only add tracking pixel for one-on-one emails
                         let emailBodyToSend = campaign.emailBody;
                         if (campaign.sendMethod === 'one-on-one') {
-                            const trackingPixelUrl = `https://schedular-plum.vercel.app/api/track?logId=${logId.toHexString()}`;
+                            const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+                            const trackingPixelUrl = `${baseUrl}/api/track?logId=${logId.toHexString()}`;
                             emailBodyToSend = `${campaign.emailBody}<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;"/>`;
                         }
 
