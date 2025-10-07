@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 
 // --- (Place these in separate files for best practice) ---
 // e.g., @/hooks/useCampaigns.ts
@@ -20,7 +19,6 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 // --- Components ---
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
-import { FaTrash } from 'react-icons/fa'; // Example using react-icons
 import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 // --- Data Fetching Hooks --------------------------------------------------
