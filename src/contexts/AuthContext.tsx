@@ -1,12 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
-    user: User | null;
+    user: any | null;
     loading: boolean;
     logout: () => Promise<void>;
 }
@@ -30,22 +28,49 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
-            setLoading(false);
-        });
+        let unsubscribe: (() => void) | null = null;
 
-        return () => unsubscribe();
+        async function initAuth() {
+            try {
+                // Lazy load Firebase auth
+                const { getFirebaseAuth } = await import('@/lib/firebase');
+                const { onAuthStateChanged } = await import('firebase/auth');
+
+                const auth = await getFirebaseAuth();
+
+                unsubscribe = onAuthStateChanged(auth, (user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+            } catch (error) {
+                console.error('Error initializing auth:', error);
+                setLoading(false);
+            }
+        }
+
+        initAuth();
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
     }, []);
 
     const logout = async () => {
         try {
+            // Lazy load Firebase auth for logout
+            const { getFirebaseAuth } = await import('@/lib/firebase');
+            const { signOut } = await import('firebase/auth');
+
+            const auth = await getFirebaseAuth();
             await signOut(auth);
+
             // Clear local storage
             localStorage.removeItem('userEmail');
             localStorage.removeItem('userName');

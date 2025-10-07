@@ -10,6 +10,7 @@
     "send:mail": "ts-node scripts/sendMail.ts"
   },
   "dependencies": {
+    "@next/bundle-analyzer": "^15.5.4",
     "@types/uuid": "^11.0.0",
     "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.12.2",
