@@ -51,11 +51,15 @@ export default function InitialPage() {
                     <div className="mb-6">
                         {/* This part for displaying your logo is fine */}
                         <div className="w-60 bg-white rounded flex items-center justify-center">
-                            {settings.textLogo ? (
-                                <Image src={`/uploads/textlogo.png`} alt="Company Logo" width={240} height={80} className="object-contain" />
-                            ) : (
-                                <Image src="/uploads/textlogo.png" alt="Company Logo" width={240} height={80} className="object-contain" />
-                            )}
+                            <Image
+                                src="/uploads/textlogo.png"
+                                alt="Campaign Illustration"
+                                className="object-contain"
+                                priority
+                                quality={85}
+                                width={240} 
+                                height={80}
+                            />
                         </div>
                     </div>
 
@@ -88,11 +92,15 @@ export default function InitialPage() {
                 {/* Image Section */}
                 <div className="hffidden md:block bg-gray-800 relative">
                     {/* This part for displaying your image is fine */}
-                    {settings.logo ? (
-                        <Image src={`/uploads/logo.png`} alt="Campaign Illustration" fill className="object-fill" />
-                    ) : (
-                        <Image src="/uploads/logo.png" alt="Campaign Illustration" fill className="object-fill" />
-                    )}
+                    <Image
+                        src="/uploads/logo.png"
+                        alt="Campaign Illustration"
+                        fill
+                        className="object-fill"
+                        priority
+                        quality={85}
+                        sizes="(max-width: 768px) 0vw, 50vw"
+                    />
                 </div>
             </div>
         </div>
