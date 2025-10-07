@@ -363,7 +363,14 @@ export default function DashboardPage() {
                 {/* Header */}
                 <header className="w-full bg-white shadow-sm border-b border-gray-300">
                     <div className="flex justify-between items-center mx-8 px-10 py-6">
-                        <img src="/uploads/textlogo.png" alt="Logo" className="h-10" />
+                        <div style={{ position: 'relative', width: '200px', height: '50px' }}>
+                            <Image
+                                src="/uploads/textlogo.png"
+                                alt="Logo"
+                                fill
+                                style={{ objectFit: 'contain' }}
+                            />
+                        </div>
                         <div className="flex items-center space-x-4">
                             {user?.photoURL && <Image src={user.photoURL} alt="Profile" width={40} height={40} className="rounded-full" />}
                             <div className="text-right">
@@ -473,7 +480,7 @@ export default function DashboardPage() {
                                 <div>
                                     {(emailTemplateAllowed || emailLogsAllowed || campaignAllowed || oneTimeBroadcastAllowed || dateBasedAutomationAllowed) && (
                                         <>
-                                            <h1 className="text-2xl font-bold text-gray-900 mb-8">Dashboard Overview</h1>                                    
+                                            <h1 className="text-2xl font-bold text-gray-900 mb-8">Dashboard Overview</h1>
                                             {/* Create Section - Show all enabled features */}
                                             <div className="mb-8">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

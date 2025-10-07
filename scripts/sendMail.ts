@@ -8,6 +8,7 @@ import type { SiteSettings } from "@/types/settings";
 import type { Campaign, Attachment } from "@/types/campaign";
 import type { AuthEmail } from "@/types/auth";
 import type { EmailLog } from "@/types/emailLog";
+import Image from 'next/image';
 import "dotenv/config";
 
 // Enhanced error categorization

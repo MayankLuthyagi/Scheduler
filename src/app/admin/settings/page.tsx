@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/admin/DashboardLayout';
 import { SiteSettings } from '@/types/settings';
 import { useTheme } from '@/contexts/ThemeContext';
 import { FiUpload, FiSave } from 'react-icons/fi';
-
+import Image from 'next/image';
 export default function AdminSettingsPage() {
     const { settings: themeSettings, refreshSettings, toggleThemeMode } = useTheme();
     const [settings, setSettings] = useState<SiteSettings>({
@@ -283,7 +283,7 @@ export default function AdminSettingsPage() {
                                             file:cursor-pointer cursor-pointer"
                                     />
                                     {settings.logo && (
-                                        <img src={`/uploads/${settings.logo}?t=${Date.now()}`} alt="Logo" className="h-8 object-contain" />
+                                        <Image src={`/uploads/${settings.logo}?t=${Date.now()}`} alt="Logo" width={100} height={32} className="h-8 object-contain" />
                                     )}
                                 </div>
                             </div>
@@ -309,7 +309,7 @@ export default function AdminSettingsPage() {
                                             file:cursor-pointer cursor-pointer"
                                     />
                                     {settings.textLogo && (
-                                        <img src={`/uploads/${settings.textLogo}?t=${Date.now()}`} alt="Text Logo" className="h-8 object-contain" />
+                                        <Image src={`/uploads/${settings.textLogo}?t=${Date.now()}`} alt="Text Logo" width={100} height={32} className="h-8 object-contain" />
                                     )}
                                 </div>
                             </div>
