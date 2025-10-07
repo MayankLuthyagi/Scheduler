@@ -494,7 +494,7 @@ type Tab = 'content' | 'scheduling' | 'sending';
 export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
     const { authEmails, isLoading: emailsLoading } = useAuthEmails(isOpen);
-    const { settings, isLoading: themeLoading } = useTheme();
+    const { settings } = useTheme();
 
     type SlateFormValues = Omit<CampaignFormData, 'emailBody'> & {
         emailBody: Descendant[];

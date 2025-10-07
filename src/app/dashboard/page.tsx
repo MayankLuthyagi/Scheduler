@@ -20,8 +20,8 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 // --- Components ---
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
-import { FaPlus, FaTrash } from 'react-icons/fa'; // Example using react-icons
-import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiUsers, FiEye, FiRefreshCw } from 'react-icons/fi';
+import { FaTrash } from 'react-icons/fa'; // Example using react-icons
+import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 // --- Data Fetching Hooks --------------------------------------------------
 
@@ -261,7 +261,6 @@ const Notification = ({ info, onDismiss, themeColor }: { info: NotificationState
 export default function DashboardPage() {
     const { user, logout } = useAuth();
     const { settings, isLoading: themeLoading } = useTheme();
-    const router = useRouter();
 
     // Feature flags
     const emailTemplateAllowed = useFeatureAllowed('emailTemplate');
@@ -921,25 +920,6 @@ const StatCard = ({ title, value, total, percentage, isLoading, note, onClick, t
         </div>
     );
 };
-
-const CampaignCard = ({ campaign, onEdit, onDelete, themeColor }: { campaign: Campaign, onEdit: () => void, onDelete: (e: React.MouseEvent) => void, themeColor: string }) => (
-    <div onClick={onEdit} className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:shadow-md transition-all cursor-pointer relative group" style={{ '--hover-border-color': themeColor } as React.CSSProperties} onMouseEnter={(e) => e.currentTarget.style.borderColor = themeColor} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}>
-        <button onClick={onDelete} className="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition opacity-0 group-hover:opacity-100 z-10" title="Delete Campaign">
-            <FaTrash className="h-4 w-4" />
-        </button>
-        <div className="pr-8">
-            <h3 className="font-semibold text-gray-900 truncate">{campaign.campaignName}</h3>
-            <p className="text-sm text-gray-600 truncate">{campaign.emailSubject}</p>
-        </div>
-        <div className={`mt-3 px-2 py-1 inline-block rounded-full text-xs font-medium`} style={campaign.isActive ? { backgroundColor: `${themeColor}20`, color: themeColor } : { backgroundColor: '#fef2f2', color: '#dc2626' }}>
-            {campaign.isActive ? 'Active' : 'Inactive'}
-        </div>
-        <div className="text-xs text-gray-500 mt-3 border-t pt-3">
-            <div>📅 {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}</div>
-            <div>🕒 {campaign.sendTime} on {campaign.sendDays.slice(0, 2).join(', ')}{campaign.sendDays.length > 2 ? `...` : ''}</div>
-        </div>
-    </div>
-);
 
 interface DeleteConfirmationModalProps {
     campaignName: string;

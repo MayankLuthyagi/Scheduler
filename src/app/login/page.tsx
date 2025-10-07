@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
+import type { User } from 'firebase/auth';
 
 // --- Custom Hook for Authentication Logic ---
 const useAuth = () => {
@@ -13,7 +14,7 @@ const useAuth = () => {
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 
-    const handleSuccessfulSignIn = useCallback(async (user: any) => {
+    const handleSuccessfulSignIn = useCallback(async (user: User) => {
         setIsLoading(true);
         setError('');
         if (!user || !user.email) {
@@ -63,7 +64,7 @@ const useAuth = () => {
         try {
             // Lazy load Firebase modules
             const { getFirebaseAuth, getGoogleProvider } = await import('@/lib/firebase');
-            const { signInWithPopup, signInWithRedirect } = await import('firebase/auth');
+            const { signInWithPopup } = await import('firebase/auth');
 
             const auth = await getFirebaseAuth();
             const googleProvider = await getGoogleProvider();

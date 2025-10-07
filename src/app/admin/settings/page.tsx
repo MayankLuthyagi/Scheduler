@@ -5,7 +5,7 @@ import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import DashboardLayout from '@/components/admin/DashboardLayout';
 import { SiteSettings } from '@/types/settings';
 import { useTheme } from '@/contexts/ThemeContext';
-import { FiUpload, FiSave } from 'react-icons/fi';
+import { FiSave } from 'react-icons/fi';
 import Image from 'next/image';
 export default function AdminSettingsPage() {
     const { settings: themeSettings, refreshSettings, toggleThemeMode } = useTheme();
