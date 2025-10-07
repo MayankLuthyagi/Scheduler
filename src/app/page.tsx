@@ -52,7 +52,7 @@ export default function InitialPage() {
                         {/* This part for displaying your logo is fine */}
                         <div className="w-60 bg-white rounded flex items-center justify-center">
                             {settings.textLogo ? (
-                                <Image src={`/uploads/${settings.textLogo}?t=${Date.now()}`} alt="Company Logo" width={240} height={80} className="object-contain" />
+                                <Image src={`/uploads/${settings.textLogo}`} alt="Company Logo" width={240} height={80} className="object-contain" />
                             ) : (
                                 <Image src="/uploads/textlogo.png" alt="Company Logo" width={240} height={80} className="object-contain" />
                             )}
@@ -86,10 +86,10 @@ export default function InitialPage() {
                 </div>
 
                 {/* Image Section */}
-                <div className="hidden md:block bg-gray-800 relative">
+                <div className="hffidden md:block bg-gray-800 relative">
                     {/* This part for displaying your image is fine */}
                     {settings.logo ? (
-                        <Image src={`/uploads/${settings.logo}?t=${Date.now()}`} alt="Campaign Illustration" fill className="object-fill" />
+                        <Image src={`/uploads/${settings.logo}`} alt="Campaign Illustration" fill className="object-fill" />
                     ) : (
                         <Image src="/uploads/logo.png" alt="Campaign Illustration" fill className="object-fill" />
                     )}

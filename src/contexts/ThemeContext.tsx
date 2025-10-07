@@ -23,6 +23,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         featureAllowed: { emailLogs: false, campaign: false }
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [isMounted, setIsMounted] = useState(false);
 
     const fetchSettings = useCallback(async () => {
         try {
@@ -106,6 +107,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // Mark component as mounted
+        setIsMounted(true);
+
         // First, check localStorage for immediate theme application
         if (typeof window !== 'undefined') {
             const savedTheme = localStorage.getItem('themeMode');
@@ -127,6 +131,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
 
     const isDarkMode = settings.themeMode === 'dark';
+
+    // Prevent hydration errors by not rendering children until mounted
+    if (!isMounted) {
+        return null;
+    }
 
     return (
         <ThemeContext.Provider value={{ settings, refreshSettings, isLoading, isDarkMode, toggleThemeMode }}>

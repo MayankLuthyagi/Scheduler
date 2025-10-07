@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Schedule App",
-  description: "Organization scheduling application",
+  title: "Schedular",
+  description: "email marketing application",
+  icons: {
+    icon: "/uploads/logo.png",
+  },
 };
 
 export default function RootLayout({

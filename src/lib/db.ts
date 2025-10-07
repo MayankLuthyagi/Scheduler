@@ -30,7 +30,7 @@ if (process.env.NODE_ENV === 'development') {
 
 export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
     const client = await clientPromise;
-    const db = client.db('test');
+    const db = client.db('test2');
     return { client, db };
 }
 

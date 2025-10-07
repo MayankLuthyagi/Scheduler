@@ -173,7 +173,7 @@ export default function LoginPage() {
                                 router.push('/admin/login');
                             }
                         }}
-                        className="w-full py-3 px-4 bg-gray-900 hover:bg-black text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 cursor-pointer"
+                        className="w-full py-3 px-4 bg-black text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 cursor-pointer"
                     >
                         Admin Panel Login
                     </button>
