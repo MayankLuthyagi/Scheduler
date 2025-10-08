@@ -450,7 +450,6 @@ const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onCh
     );
 };
 
-
 // --- Custom Hook for Fetching Data ---
 const useAuthEmails = (isOpen: boolean) => {
     // ... (rest of the hook is unchanged)
@@ -479,7 +478,6 @@ const useAuthEmails = (isOpen: boolean) => {
     }, [isOpen]);
     return { authEmails, isLoading };
 };
-
 
 // --- Main Campaign Form Component ---
 interface CampaignFormProps {
@@ -516,6 +514,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         sheetId: '',
         attachment: null,
         attachmentNote: '',
+        randomSend: false,
         isActive: true,
     }), []);
 
@@ -544,6 +543,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                 attachment: null, // Always null since we can't pre-populate file inputs
                 attachmentNote: editCampaign.attachments?.[0]?.note || '',
                 isActive: editCampaign.isActive !== undefined ? editCampaign.isActive : true,
+                randomSend: editCampaign.randomSend || false,
             };
             reset(processedEditData);
         } else {
@@ -670,6 +670,24 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                                             )}
                                         />
                                     )}
+                                    <Controller
+                                        name="randomSend"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <label className="flex items-center space-x-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={field.value}
+                                                    onChange={field.onChange}
+                                                    className="h-4 w-4 border-gray-300 rounded focus:ring-2"
+                                                    style={{
+                                                        accentColor: settings.themeColor
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-gray-700">Randomly Sent</span>
+                                            </label>
+                                        )}
+                                    />
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <FormSelect
                                             key={`sendMethod-${editCampaign?.campaignId || 'new'}`}
