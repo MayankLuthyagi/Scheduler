@@ -318,7 +318,7 @@ const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onCh
 
         // Ensure the editor always has at least one paragraph
         e.normalizeNode = (entry) => {
-            const [node, path] = entry;
+            const path = entry[1];
 
             // If the editor is empty, insert an empty paragraph
             if (path.length === 0) {
