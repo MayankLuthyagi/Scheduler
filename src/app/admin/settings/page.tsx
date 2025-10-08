@@ -5,8 +5,8 @@ import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import DashboardLayout from '@/components/admin/DashboardLayout';
 import { SiteSettings } from '@/types/settings';
 import { useTheme } from '@/contexts/ThemeContext';
-import { FiUpload, FiSave } from 'react-icons/fi';
-
+import { FiSave } from 'react-icons/fi';
+import Image from 'next/image';
 export default function AdminSettingsPage() {
     const { settings: themeSettings, refreshSettings, toggleThemeMode } = useTheme();
     const [settings, setSettings] = useState<SiteSettings>({
@@ -15,8 +15,11 @@ export default function AdminSettingsPage() {
         textLogo: undefined,
         logo: undefined,
         featureAllowed: {
+            emailTemplate: false,
             emailLogs: false,
             campaign: false,
+            oneTimeBroadcast: false,
+            dateBasedAutomation: false,
         }
     });
     const [formData, setFormData] = useState({
@@ -25,8 +28,11 @@ export default function AdminSettingsPage() {
         textLogo: null as File | null,
         logo: null as File | null,
         featureAllowed: {
+            emailTemplate: false,
             emailLogs: false,
             campaign: false,
+            oneTimeBroadcast: false,
+            dateBasedAutomation: false,
         },
     });
     const [loading, setLoading] = useState(true);
@@ -59,7 +65,13 @@ export default function AdminSettingsPage() {
                     themeMode: data.settings.themeMode || 'light',
                     textLogo: null,
                     logo: null,
-                    featureAllowed: data.settings.featureAllowed || { emailLogs: false, campaign: false }
+                    featureAllowed: {
+                        emailTemplate: data.settings.featureAllowed?.emailTemplate ?? false,
+                        emailLogs: data.settings.featureAllowed?.emailLogs ?? false,
+                        campaign: data.settings.featureAllowed?.campaign ?? false,
+                        oneTimeBroadcast: data.settings.featureAllowed?.oneTimeBroadcast ?? false,
+                        dateBasedAutomation: data.settings.featureAllowed?.dateBasedAutomation ?? false,
+                    }
                 });
             }
         } catch (error) {
@@ -128,8 +140,11 @@ export default function AdminSettingsPage() {
             }
 
             // Append feature allowed data
+            submitFormData.append('emailTemplate', String(formData.featureAllowed.emailTemplate));
             submitFormData.append('emailLogs', String(formData.featureAllowed.emailLogs));
             submitFormData.append('campaign', String(formData.featureAllowed.campaign));
+            submitFormData.append('oneTimeBroadcast', String(formData.featureAllowed.oneTimeBroadcast));
+            submitFormData.append('dateBasedAutomation', String(formData.featureAllowed.dateBasedAutomation));
 
             const response = await fetch('/api/settings', {
                 method: 'POST',
@@ -180,11 +195,11 @@ export default function AdminSettingsPage() {
     return (
         <AdminProtectedRoute>
             <DashboardLayout>
-                <div className="max-w-4xl mx-auto">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Site Settings</h1>
+                <div className="max-w-3xl mx-auto">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Settings</h1>
 
                     {message && (
-                        <div className={`mb-6 p-4 rounded-md transition-theme ${message.type === 'success'
+                        <div className={`mb-4 p-3 rounded-md text-sm ${message.type === 'success'
                             ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700'
                             : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700'
                             }`}>
@@ -192,134 +207,247 @@ export default function AdminSettingsPage() {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-8">
-                        {/* Theme Color Section */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-theme">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Theme Color</h2>
-                            <div className="flex items-center space-x-4">
-                                <div className="flex-1">
-                                    <label htmlFor="themeColor" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
-                                        Choose your site&apos;s primary color
-                                    </label>
-                                    <div className="flex items-center space-x-3">
-                                        <input type="color" id="themeColor" value={formData.themeColor} onChange={handleColorChange} className="w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer" />
-                                        <input type="text" value={formData.themeColor} onChange={(e) => setFormData(prev => ({ ...prev, themeColor: e.target.value }))} className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 transition-theme" style={{ '--tw-ring-color': formData.themeColor } as React.CSSProperties} placeholder="#3b82f6" />
-                                    </div>
-                                </div>
-                                <div className="w-24 h-24 rounded-lg border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center" style={{ backgroundColor: formData.themeColor }}>
-                                    <span className="text-white text-xs font-medium">Preview</span>
+                    <form onSubmit={handleSubmit}>
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 transition-theme">
+
+                            {/* Site Theme Section Header */}
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Site Theme</h3>
+                            </div>
+
+                            {/* Theme Color */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label className="block text-sm font-medium text-black mb-2">
+                                    Theme Color
+                                </label>
+                                <div className="flex items-center space-x-3">
+                                    <input
+                                        type="color"
+                                        id="themeColor"
+                                        value={formData.themeColor}
+                                        onChange={handleColorChange}
+                                        className="w-10 h-10 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={formData.themeColor}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, themeColor: e.target.value }))}
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:outline-none focus:ring-1 transition-theme"
+                                        style={{ '--tw-ring-color': formData.themeColor } as React.CSSProperties}
+                                        placeholder="#3b82f6"
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Feature Management Section */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-theme">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Feature Management</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Enable or disable specific features across the site.</p>
-                            <div className="space-y-4">
-                                {/* Email Logs Toggle */}
+                            {/* Theme Mode */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label htmlFor="theme-mode-toggle" className="flex items-center justify-between cursor-pointer">
+                                    <span className="text-sm font-medium text-black">
+                                        {themeSettings?.themeMode === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                                    </span>
+                                    <div className="relative">
+                                        <input
+                                            id="theme-mode-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={themeSettings?.themeMode === 'dark'}
+                                            onChange={() => handleThemeModeChange(themeSettings?.themeMode === 'dark' ? 'light' : 'dark')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${themeSettings?.themeMode === 'dark' ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={themeSettings?.themeMode === 'dark' ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${themeSettings?.themeMode === 'dark' ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Main Logo */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label className="block text-sm font-medium text-black mb-2">
+                                    Main Logo
+                                </label>
+                                <div className="flex items-center space-x-3">
+                                    <input
+                                        type="file"
+                                        id="logo"
+                                        accept=".png"
+                                        onChange={(e) => handleFileChange(e, 'logo')}
+                                        className="block flex-1 text-xs text-gray-600 dark:text-gray-400 
+                                            file:mr-3 file:py-2 file:px-3 
+                                            file:rounded file:border-0 
+                                            file:text-xs file:font-medium 
+                                            file:bg-gray-50 dark:file:bg-gray-900/30 
+                                            file:text-black dark:file:text-white
+                                            hover:file:bg-gray-100 dark:hover:file:bg-gray-900/50 
+                                            file:cursor-pointer cursor-pointer"
+                                    />
+                                    {settings.logo && (
+                                        <Image src={`/uploads/${settings.logo}?t=${Date.now()}`} alt="Logo" width={100} height={32} className="h-8 object-contain" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Text Logo */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label className="block text-sm font-medium text-black mb-2">
+                                    Text Logo
+                                </label>
+                                <div className="flex items-center space-x-3">
+                                    <input
+                                        type="file"
+                                        id="textLogo"
+                                        accept=".png"
+                                        onChange={(e) => handleFileChange(e, 'textLogo')}
+                                        className="block flex-1 text-xs text-gray-600 dark:text-gray-400 
+                                            file:mr-3 file:py-2 file:px-3 
+                                            file:rounded file:border-0 
+                                            file:text-xs file:font-medium 
+                                            file:bg-gray-50 dark:file:bg-gray-900/30 
+                                            file:text-black dark:file:text-white
+                                            hover:file:bg-gray-100 dark:hover:file:bg-gray-900/50 
+                                            file:cursor-pointer cursor-pointer"
+                                    />
+                                    {settings.textLogo && (
+                                        <Image src={`/uploads/${settings.textLogo}?t=${Date.now()}`} alt="Text Logo" width={100} height={32} className="h-8 object-contain" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Features Section Header */}
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Features</h3>
+                            </div>
+
+                            {/* Email Template Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label htmlFor="emailTemplate-toggle" className="flex items-center justify-between cursor-pointer">
+                                    <span className="text-sm font-medium text-black">Email Template</span>
+                                    <div className="relative">
+                                        <input
+                                            id="emailTemplate-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.emailTemplate ?? false}
+                                            onChange={() => handleFeatureToggle('emailTemplate')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.emailTemplate ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.emailTemplate ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.emailTemplate ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* User Analytics Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                                 <label htmlFor="emailLogs-toggle" className="flex items-center justify-between cursor-pointer">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Email Logs</span>
+                                    <span className="text-sm font-medium text-black">User Analytics</span>
                                     <div className="relative">
-                                        <input id="emailLogs-toggle" type="checkbox" className="sr-only" checked={formData.featureAllowed.emailLogs} onChange={() => handleFeatureToggle('emailLogs')} />
-                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.featureAllowed.emailLogs ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.featureAllowed.emailLogs ? 'transform translate-x-6' : ''}`}></div>
+                                        <input
+                                            id="emailLogs-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.emailLogs ?? false}
+                                            onChange={() => handleFeatureToggle('emailLogs')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.emailLogs ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.emailLogs ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.emailLogs ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                 </label>
-                                {/* Campaign Toggle */}
+                            </div>
+
+                            {/* Campaign Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                                 <label htmlFor="campaign-toggle" className="flex items-center justify-between cursor-pointer">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Campaign</span>
+                                    <span className="text-sm font-medium text-black">Campaign</span>
                                     <div className="relative">
-                                        <input id="campaign-toggle" type="checkbox" className="sr-only" checked={formData.featureAllowed.campaign} onChange={() => handleFeatureToggle('campaign')} />
-                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.featureAllowed.campaign ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.featureAllowed.campaign ? 'transform translate-x-6' : ''}`}></div>
+                                        <input
+                                            id="campaign-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.campaign ?? false}
+                                            onChange={() => handleFeatureToggle('campaign')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.campaign ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.campaign ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.campaign ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                 </label>
                             </div>
-                        </div>
 
-                        {/* Theme Mode Section */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-theme">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Theme Mode</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Choose between light and dark mode for the system interface.</p>
-                            <div className="flex space-x-4">
-                                <button type="button" onClick={() => handleThemeModeChange('light')} className={`flex-1 text-center px-4 py-3 rounded-lg border-2 transition-all ${themeSettings.themeMode === 'light' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'}`}>
-                                    <div className="font-medium">Light Mode</div>
-                                </button>
-                                <button type="button" onClick={() => handleThemeModeChange('dark')} className={`flex-1 text-center px-4 py-3 rounded-lg border-2 transition-all ${themeSettings.themeMode === 'dark' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'}`}>
-                                    <div className="font-medium">Dark Mode</div>
-                                </button>
+                            {/* One-Time Broadcast Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label htmlFor="oneTimeBroadcast-toggle" className="flex items-center justify-between cursor-pointer">
+                                    <span className="text-sm font-medium text-black">One-Time Broadcast</span>
+                                    <div className="relative">
+                                        <input
+                                            id="oneTimeBroadcast-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.oneTimeBroadcast ?? false}
+                                            onChange={() => handleFeatureToggle('oneTimeBroadcast')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.oneTimeBroadcast ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.oneTimeBroadcast ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.oneTimeBroadcast ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                </label>
                             </div>
-                        </div>
 
-                        {/* Logo Section */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-theme">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Main Logo</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                                <div>
-                                    <label htmlFor="logo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Upload Main Logo (PNG only & 5MB max)
-                                    </label>
-                                    <input type="file" id="logo" accept=".png" onChange={(e) => handleFileChange(e, 'logo')} className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                                </div>
-                                <div className="flex items-center justify-center md:justify-end">
-                                    {settings.logo ? (
-                                        <div className="text-center">
-                                            <img src={`/uploads/${settings.logo}?t=${Date.now()}`} alt="Current Logo" className="max-w-full max-h-12 object-contain mx-auto mb-2" />
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Current Logo</p>
-                                        </div>
+                            {/* Date-Based Automation Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label htmlFor="dateBasedAutomation-toggle" className="flex items-center justify-between cursor-pointer">
+                                    <span className="text-sm font-medium text-black">Date-Based Automation</span>
+                                    <div className="relative">
+                                        <input
+                                            id="dateBasedAutomation-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.dateBasedAutomation ?? false}
+                                            onChange={() => handleFeatureToggle('dateBasedAutomation')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.dateBasedAutomation ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.dateBasedAutomation ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.dateBasedAutomation ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Save Button */}
+                            <div className="p-4 flex justify-end">
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    style={{ backgroundColor: formData.themeColor }}
+                                    className="inline-flex items-center px-4 py-2 text-sm font-medium rounded text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                                >
+                                    {saving ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Saving...
+                                        </>
                                     ) : (
-                                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center">
-                                            <FiUpload className="text-gray-400" size={24} />
-                                        </div>
+                                        <>
+                                            <FiSave className="mr-2" size={16} />
+                                            Save Settings
+                                        </>
                                     )}
-                                </div>
+                                </button>
                             </div>
-                        </div>
-
-                        {/* Text Logo Section */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-theme">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Text Logo</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                                <div>
-                                    <label htmlFor="textLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Upload Text Logo (PNG only & 5MB max)
-                                    </label>
-                                    <input type="file" id="textLogo" accept=".png" onChange={(e) => handleFileChange(e, 'textLogo')} className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                                </div>
-                                <div className="flex items-center justify-center md:justify-end">
-                                    {settings.textLogo ? (
-                                        <div className="text-center">
-                                            <img src={`/uploads/${settings.textLogo}?t=${Date.now()}`} alt="Current Text Logo" className="max-w-full max-h-12 object-contain mx-auto mb-2" />
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Current Text Logo</p>
-                                        </div>
-                                    ) : (
-                                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center">
-                                            <FiUpload className="text-gray-400" size={24} />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Save Button */}
-                        <div className="flex justify-end">
-                            <button type="submit" disabled={saving} style={{ backgroundColor: formData.themeColor }} className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity">
-                                {saving ? (
-                                    <>
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <FiSave className="mr-2" />
-                                        Save Settings
-                                    </>
-                                )}
-                            </button>
                         </div>
                     </form>
                 </div>

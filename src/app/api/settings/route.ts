@@ -20,8 +20,11 @@ export async function GET() {
                     textLogo: null,
                     logo: null,
                     featureAllowed: {
+                        emailTemplate: false,
                         emailLogs: false,
                         campaign: false,
+                        oneTimeBroadcast: false,
+                        dateBasedAutomation: false,
                     },
                 }
             });
@@ -34,7 +37,13 @@ export async function GET() {
                 themeMode: settings.themeMode || 'light',
                 textLogo: settings.textLogo,
                 logo: settings.logo,
-                featureAllowed: settings.featureAllowed || { emailLogs: false, campaign: false }
+                featureAllowed: settings.featureAllowed || {
+                    emailTemplate: false,
+                    emailLogs: false,
+                    campaign: false,
+                    oneTimeBroadcast: false,
+                    dateBasedAutomation: false,
+                }
             }
         });
     } catch (error) {
@@ -56,8 +65,11 @@ export async function POST(request: NextRequest) {
 
         // Handle featureAllowed toggles
         const featureAllowed = {
+            emailTemplate: formData.get('emailTemplate') === 'true',
             emailLogs: formData.get('emailLogs') === 'true',
             campaign: formData.get('campaign') === 'true',
+            oneTimeBroadcast: formData.get('oneTimeBroadcast') === 'true',
+            dateBasedAutomation: formData.get('dateBasedAutomation') === 'true',
         };
 
         if (!themeColor) {

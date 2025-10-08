@@ -9,13 +9,24 @@ import { Slate, Editable, withReact, useSlate, ReactEditor } from 'slate-react';
 import { withHistory } from 'slate-history';
 import { useTheme } from '@/contexts/ThemeContext';
 // --- Slate.js Type Definitions ---
-type CustomElement = { type: 'paragraph'; children: CustomText[] };
-type CustomText = { text: string; bold?: true; italic?: true; code?: true };
+type LinkElement = { type: 'link'; url: string; children: CustomText[] };
+type ListItemElement = { type: 'list-item'; children: (CustomText | LinkElement)[] };
+type BulletedListElement = { type: 'bulleted-list'; children: ListItemElement[] };
+type NumberedListElement = { type: 'numbered-list'; children: ListItemElement[] };
+type ParagraphElement = { type: 'paragraph'; children: (CustomText | LinkElement)[] };
+type CustomElement = ParagraphElement | LinkElement | ListItemElement | BulletedListElement | NumberedListElement;
+type CustomText = { text: string; bold?: true; italic?: true; code?: true; underline?: true };
 
 interface RenderLeafProps {
     attributes: Record<string, unknown>;
     children: React.ReactNode;
     leaf: CustomText;
+}
+
+interface RenderElementProps {
+    attributes: Record<string, unknown>;
+    children: React.ReactNode;
+    element: CustomElement;
 }
 
 declare module 'slate' {
@@ -37,6 +48,7 @@ const serializeSlateToHTML = (nodes: Descendant[]): string => {
             if (node.bold) html = `<strong>${html}</strong>`;
             if (node.italic) html = `<em>${html}</em>`;
             if (node.code) html = `<code>${html}</code>`;
+            if (node.underline) html = `<u>${html}</u>`;
             return html;
         }
 
@@ -44,6 +56,14 @@ const serializeSlateToHTML = (nodes: Descendant[]): string => {
         switch (node.type) {
             case 'paragraph':
                 return `<p>${children}</p>`;
+            case 'link':
+                return `<a href="${node.url}" target="_blank" rel="noopener noreferrer">${children}</a>`;
+            case 'bulleted-list':
+                return `<ul>${children}</ul>`;
+            case 'numbered-list':
+                return `<ol>${children}</ol>`;
+            case 'list-item':
+                return `<li>${children}</li>`;
             default:
                 return children;
         }
@@ -57,35 +77,202 @@ const deserializeHTMLToSlate = (html: string): Descendant[] => {
     const parsed = new DOMParser().parseFromString(html, 'text/html');
     const body = parsed.body;
 
-    const toSlateNode = (el: Node): Descendant[] | CustomText => {
+    const deserialize = (el: Node, parentMarks: Partial<CustomText> = {}): (Descendant | CustomText | LinkElement)[] => {
         if (el.nodeType === Node.TEXT_NODE) {
-            return { text: el.textContent || '' };
-        } else if (el.nodeType !== Node.ELEMENT_NODE) {
-            return { text: '' };
+            if (!el.textContent) return [];
+            return [{ text: el.textContent, ...parentMarks }];
+        }
+
+        if (el.nodeType !== Node.ELEMENT_NODE) {
+            return [];
         }
 
         const element = el as HTMLElement;
-        const children = Array.from(element.childNodes).flatMap(toSlateNode);
+        const nodeName = element.nodeName;
 
-        switch (element.nodeName) {
-            case 'P':
-                return [{ type: 'paragraph', children: children.filter(Text.isText) }];
+        // Start fresh - don't automatically inherit all parent marks
+        // Only inherit marks for inline formatting elements
+        let currentMarks: Partial<CustomText> = {};
+
+        // For formatting elements, inherit parent marks and add new ones
+        const isFormattingElement = ['STRONG', 'B', 'EM', 'I', 'U', 'CODE', 'SPAN', 'A'].includes(nodeName);
+        if (isFormattingElement) {
+            currentMarks = { ...parentMarks };
+        }
+
+        // Handle marks (formatting) from semantic HTML
+        switch (nodeName) {
             case 'STRONG':
-                return children.map(child => ({ ...child, bold: true }));
+            case 'B':
+                currentMarks.bold = true;
+                break;
             case 'EM':
-                return children.map(child => ({ ...child, italic: true }));
+            case 'I':
+                currentMarks.italic = true;
+                break;
+            case 'U':
+                currentMarks.underline = true;
+                break;
             case 'CODE':
-                return children.map(child => ({ ...child, code: true }));
-            case 'BODY': // Top-level container
-                return children.length > 0 ? children : initialSlateValue;
+                currentMarks.code = true;
+                break;
+        }
+
+        // Check for inline styles (Google Docs often uses these on SPAN elements)
+        if (nodeName === 'SPAN') {
+            const style = element.style;
+            if (style && style.fontWeight) {
+                const fontWeight = style.fontWeight;
+                const numericWeight = parseInt(fontWeight);
+                // Only apply bold if font-weight is >= 600 (semi-bold or bold)
+                // Normal weight is 400, bold is 700
+                if (fontWeight === 'bold' || (!isNaN(numericWeight) && numericWeight >= 600)) {
+                    currentMarks.bold = true;
+                }
+            }
+            if (style && style.fontStyle === 'italic') {
+                currentMarks.italic = true;
+            }
+            if (style && style.textDecoration && style.textDecoration.includes('underline')) {
+                currentMarks.underline = true;
+            }
+        }
+
+        // Process children with the current marks
+        const children = Array.from(element.childNodes)
+            .flatMap(child => deserialize(child, currentMarks))
+            .flat();
+
+        // Handle block elements
+        switch (nodeName) {
+            case 'BODY':
+            case 'HTML':
+                return children;
+            case 'BR':
+                return [{ text: '\n' }];
+            case 'P':
+            case 'DIV':
+            case 'H1':
+            case 'H2':
+            case 'H3':
+            case 'H4':
+            case 'H5':
+            case 'H6': {
+                const paragraphChildren = children.length > 0
+                    ? children.filter((child): child is CustomText | LinkElement =>
+                        Text.isText(child) || (typeof child === 'object' && 'type' in child && child.type === 'link')
+                    )
+                    : [{ text: '' }];
+                return [{ type: 'paragraph', children: paragraphChildren }];
+            }
+            case 'UL': {
+                const listItems = children.filter((child): child is ListItemElement =>
+                    !Text.isText(child) && typeof child === 'object' && 'type' in child && child.type === 'list-item'
+                );
+                if (listItems.length === 0) return [];
+                return [{ type: 'bulleted-list', children: listItems }];
+            }
+            case 'OL': {
+                const listItems = children.filter((child): child is ListItemElement =>
+                    !Text.isText(child) && typeof child === 'object' && 'type' in child && child.type === 'list-item'
+                );
+                if (listItems.length === 0) return [];
+                return [{ type: 'numbered-list', children: listItems }];
+            }
+            case 'LI': {
+                // For list items, we want to extract all inline content (text and links)
+                // but flatten any nested block elements
+                const extractInlineContent = (nodes: (Descendant | CustomText | LinkElement)[]): (CustomText | LinkElement)[] => {
+                    const result: (CustomText | LinkElement)[] = [];
+
+                    for (const node of nodes) {
+                        if (Text.isText(node)) {
+                            result.push(node);
+                        } else if (typeof node === 'object' && 'type' in node) {
+                            if (node.type === 'link') {
+                                result.push(node as LinkElement);
+                            } else if (node.type === 'paragraph' && 'children' in node) {
+                                // Extract children from nested paragraphs
+                                result.push(...extractInlineContent(node.children));
+                            } else if ('children' in node) {
+                                // For other block elements, extract their inline content
+                                result.push(...extractInlineContent(node.children));
+                            }
+                        }
+                    }
+
+                    return result;
+                };
+
+                const inlineContent = extractInlineContent(children);
+                const listItemChildren = inlineContent.length > 0 ? inlineContent : [{ text: '' }];
+
+                return [{ type: 'list-item', children: listItemChildren }];
+            }
+            case 'A': {
+                const href = element.getAttribute('href') || '';
+                const linkChildren = children.filter(Text.isText);
+                if (linkChildren.length === 0) {
+                    linkChildren.push({ text: element.textContent || '', ...currentMarks });
+                }
+                return [{ type: 'link', url: href, children: linkChildren }];
+            }
+            case 'SPAN':
+            case 'STRONG':
+            case 'B':
+            case 'EM':
+            case 'I':
+            case 'U':
+            case 'CODE':
+                return children;
             default:
-                return children.filter(Text.isText);
+                // For unknown elements, just return their children
+                return children;
         }
     };
 
-    const result = toSlateNode(body) as Descendant[];
-    // Ensure the result is always a valid Slate structure
-    return result.length > 0 ? result : initialSlateValue;
+    const result = deserialize(body);
+
+    // Filter to get only valid Descendant nodes
+    const nodes = result.filter((node): node is Descendant =>
+        !Text.isText(node) && typeof node === 'object' && 'type' in node && 'children' in node
+    );
+
+    // Ensure we have at least one valid paragraph with proper structure
+    if (nodes.length === 0) {
+        return initialSlateValue;
+    }
+
+    // Validate each node has children
+    const validNodes = nodes.map(node => {
+        if (!Text.isText(node) && 'type' in node) {
+            if (node.type === 'paragraph') {
+                const paragraphNode = node as ParagraphElement;
+                const children = paragraphNode.children.filter((child: CustomText | LinkElement): child is CustomText | LinkElement =>
+                    Text.isText(child) || (typeof child === 'object' && 'type' in child && child.type === 'link')
+                );
+                return {
+                    ...paragraphNode,
+                    children: children.length > 0 ? children : [{ text: '' }]
+                } as Descendant;
+            } else if (node.type === 'bulleted-list' || node.type === 'numbered-list') {
+                const listNode = node as BulletedListElement | NumberedListElement;
+                return listNode.children.length > 0 ? node : null;
+            } else if (node.type === 'list-item') {
+                const listItemNode = node as ListItemElement;
+                const children = listItemNode.children.filter((child: CustomText | LinkElement): child is CustomText | LinkElement =>
+                    Text.isText(child) || (typeof child === 'object' && 'type' in child && child.type === 'link')
+                );
+                return {
+                    ...listItemNode,
+                    children: children.length > 0 ? children : [{ text: '' }]
+                } as Descendant;
+            }
+        }
+        return node;
+    }).filter((node): node is Descendant => node !== null);
+
+    return validNodes;
 };
 
 
@@ -120,19 +307,123 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
 };
 
 const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onChange: (value: Descendant[]) => void; editorKey?: string; }) => {
-    const editor = useMemo(() => withHistory(withReact(createEditor())), []);
+    const editor = useMemo(() => {
+        const e = withHistory(withReact(createEditor()));
+
+        // Customize the editor to treat links as inline elements
+        const { isInline, normalizeNode } = e;
+        e.isInline = (element) => {
+            return element.type === 'link' ? true : isInline(element);
+        };
+
+        // Ensure the editor always has at least one paragraph
+        e.normalizeNode = (entry) => {
+            const path = entry[1];
+
+            // If the editor is empty, insert an empty paragraph
+            if (path.length === 0) {
+                if (editor.children.length === 0) {
+                    const paragraph: CustomElement = { type: 'paragraph', children: [{ text: '' }] };
+                    editor.children.push(paragraph);
+                    return;
+                }
+            }
+
+            normalizeNode(entry);
+        };
+
+        return e;
+    }, []);
 
     const renderLeaf = useCallback((props: RenderLeafProps) => {
         let children = props.children;
         if (props.leaf.bold) children = <strong>{children}</strong>;
         if (props.leaf.italic) children = <em>{children}</em>;
         if (props.leaf.code) children = <code>{children}</code>;
+        if (props.leaf.underline) children = <u>{children}</u>;
         return <span {...props.attributes}>{children}</span>;
     }, []);
 
+    const renderElement = useCallback((props: RenderElementProps) => {
+        const { attributes, children, element } = props;
+        switch (element.type) {
+            case 'link':
+                return (
+                    <a
+                        {...attributes}
+                        href={element.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline hover:text-blue-800"
+                    >
+                        {children}
+                    </a>
+                );
+            case 'bulleted-list':
+                return <ul {...attributes} className="list-disc list-inside ml-4">{children}</ul>;
+            case 'numbered-list':
+                return <ol {...attributes} className="list-decimal list-inside ml-4">{children}</ol>;
+            case 'list-item':
+                return <li {...attributes}>{children}</li>;
+            case 'paragraph':
+            default:
+                return <p {...attributes}>{children}</p>;
+        }
+    }, []);
+
     const editorValue = useMemo(() => {
-        return value && value.length > 0 ? value : initialSlateValue;
+        // Ensure we always have a valid structure
+        if (!value || value.length === 0) {
+            return initialSlateValue;
+        }
+
+        // Validate that all elements are proper Descendants
+        const validValue = value.filter((node): node is Descendant =>
+            !Text.isText(node) && typeof node === 'object' && 'type' in node && 'children' in node
+        );
+
+        return validValue.length > 0 ? validValue : initialSlateValue;
     }, [value]);
+
+    // Handle paste event to preserve HTML formatting
+    const handlePaste = useCallback((event: React.ClipboardEvent) => {
+        event.preventDefault();
+        const html = event.clipboardData.getData('text/html');
+
+        if (html) {
+            try {
+                // Parse the HTML content
+                const fragment = deserializeHTMLToSlate(html);
+
+                if (fragment && fragment.length > 0) {
+                    // Ensure the editor has a valid selection
+                    const { selection } = editor;
+
+                    if (!selection) {
+                        // If no selection, create one at the start
+                        const point = { path: [0, 0], offset: 0 };
+                        editor.selection = { anchor: point, focus: point };
+                    }
+
+                    // Insert the fragment at the current selection
+                    Editor.insertFragment(editor, fragment);
+                }
+            } catch (error) {
+                console.error('Error pasting HTML:', error);
+                // Fallback to plain text if HTML parsing fails
+                const text = event.clipboardData.getData('text/plain');
+                if (text) {
+                    Editor.insertText(editor, text);
+                }
+            }
+        } else {
+            // Fallback to plain text if no HTML
+            const text = event.clipboardData.getData('text/plain');
+            if (text) {
+                Editor.insertText(editor, text);
+            }
+        }
+    }, [editor]);
 
     return (
         <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
@@ -149,14 +440,15 @@ const SlateEditor = ({ value, onChange, editorKey }: { value: Descendant[]; onCh
                 </div>
                 <Editable
                     renderLeaf={renderLeaf}
+                    renderElement={renderElement}
                     className="p-3 min-h-[300px] focus:outline-none"
                     placeholder="Write your email content here..."
+                    onPaste={handlePaste}
                 />
             </Slate>
         </div>
     );
 };
-
 
 // --- Custom Hook for Fetching Data ---
 const useAuthEmails = (isOpen: boolean) => {
@@ -187,7 +479,6 @@ const useAuthEmails = (isOpen: boolean) => {
     return { authEmails, isLoading };
 };
 
-
 // --- Main Campaign Form Component ---
 interface CampaignFormProps {
     isOpen: boolean;
@@ -201,7 +492,7 @@ type Tab = 'content' | 'scheduling' | 'sending';
 export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
     const { authEmails, isLoading: emailsLoading } = useAuthEmails(isOpen);
-    const { settings, isLoading: themeLoading } = useTheme();
+    const { settings } = useTheme();
 
     type SlateFormValues = Omit<CampaignFormData, 'emailBody'> & {
         emailBody: Descendant[];
@@ -223,6 +514,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         sheetId: '',
         attachment: null,
         attachmentNote: '',
+        randomSend: false,
         isActive: true,
     }), []);
 
@@ -251,6 +543,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                 attachment: null, // Always null since we can't pre-populate file inputs
                 attachmentNote: editCampaign.attachments?.[0]?.note || '',
                 isActive: editCampaign.isActive !== undefined ? editCampaign.isActive : true,
+                randomSend: editCampaign.randomSend || false,
             };
             reset(processedEditData);
         } else {
@@ -278,8 +571,8 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
             type="button"
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tab
-                    ? 'text-white'
-                    : 'text-gray-600 hover:bg-gray-200'
+                ? 'text-white'
+                : 'text-gray-600 hover:bg-gray-200'
                 }`}
             style={{
                 backgroundColor: activeTab === tab ? settings.themeColor : 'transparent'
@@ -377,6 +670,24 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                                             )}
                                         />
                                     )}
+                                    <Controller
+                                        name="randomSend"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <label className="flex items-center space-x-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={field.value}
+                                                    onChange={field.onChange}
+                                                    className="h-4 w-4 border-gray-300 rounded focus:ring-2"
+                                                    style={{
+                                                        accentColor: settings.themeColor
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-gray-700">Randomly Sent</span>
+                                            </label>
+                                        )}
+                                    />
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <FormSelect
                                             key={`sendMethod-${editCampaign?.campaignId || 'new'}`}
@@ -555,8 +866,8 @@ const ToggleButtonGroup = ({ label, options, value, onChange }: { label: string;
                         type="button"
                         onClick={() => handleSelect(option)}
                         className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${value.includes(option)
-                                ? 'text-white'
-                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                            ? 'text-white'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
                             }`}
                         style={{
                             backgroundColor: value.includes(option) ? settings.themeColor : 'white',

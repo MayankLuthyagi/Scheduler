@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import type { FirebaseApp } from 'firebase/app';
+import type { Auth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,19 +11,41 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let firebaseApp: FirebaseApp | null = null;
+let firebaseAuth: Auth | null = null;
+let googleAuthProvider: GoogleAuthProvider | null = null;
 
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
+// Lazy initialize Firebase app
+async function getFirebaseApp() {
+    if (firebaseApp) return firebaseApp;
 
-// Initialize Google Provider with custom parameters
-export const googleProvider = new GoogleAuthProvider();
+    const { initializeApp } = await import('firebase/app');
+    firebaseApp = initializeApp(firebaseConfig);
+    return firebaseApp;
+}
 
-// Add custom parameters to prevent caching issues and improve reliability
-googleProvider.setCustomParameters({
-    prompt: 'select_account',
-    display: 'popup'
-});
+// Lazy initialize Firebase Auth
+export async function getFirebaseAuth() {
+    if (firebaseAuth) return firebaseAuth;
 
-export default app;
+    const app = await getFirebaseApp();
+    const { getAuth } = await import('firebase/auth');
+    firebaseAuth = getAuth(app);
+    return firebaseAuth;
+}
+
+// Lazy initialize Google Provider
+export async function getGoogleProvider() {
+    if (googleAuthProvider) return googleAuthProvider;
+
+    const { GoogleAuthProvider } = await import('firebase/auth');
+    googleAuthProvider = new GoogleAuthProvider();
+
+    // Add custom parameters to prevent caching issues and improve reliability
+    googleAuthProvider.setCustomParameters({
+        prompt: 'select_account',
+        display: 'popup'
+    });
+
+    return googleAuthProvider;
+}
