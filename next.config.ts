@@ -3,9 +3,6 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
-module.exports = withBundleAnalyzer({
-  reactStrictMode: true,
-});
 
 const nextConfig: NextConfig = {
   // Enable compiler optimizations
@@ -114,4 +111,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = withBundleAnalyzer(nextConfig);

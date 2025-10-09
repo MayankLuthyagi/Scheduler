@@ -362,7 +362,7 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-center mx-8 px-10 py-6">
                         <div style={{ position: 'relative', width: '200px', height: '50px' }}>
                             <Image
-                                src="/uploads/textlogo.png"
+                                src="/uploads/textlogo.webp"
                                 alt="Logo"
                                 fill
                                 style={{ objectFit: 'contain' }}

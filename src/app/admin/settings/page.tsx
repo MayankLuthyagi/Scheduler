@@ -10,7 +10,7 @@ import Image from 'next/image';
 export default function AdminSettingsPage() {
     const { settings: themeSettings, refreshSettings, toggleThemeMode } = useTheme();
     const [settings, setSettings] = useState<SiteSettings>({
-        themeColor: '#3b82f6',
+        themeColor: '#000000',
         themeMode: 'light',
         textLogo: undefined,
         logo: undefined,
@@ -23,7 +23,7 @@ export default function AdminSettingsPage() {
         }
     });
     const [formData, setFormData] = useState({
-        themeColor: '#3b82f6',
+        themeColor: '#000000',
         themeMode: 'light' as 'light' | 'dark',
         textLogo: null as File | null,
         logo: null as File | null,
@@ -91,8 +91,8 @@ export default function AdminSettingsPage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'textLogo' | 'logo') => {
         const file = e.target.files?.[0];
         if (file) {
-            if (!file.type.includes('png')) {
-                setMessage({ type: 'error', text: 'Only PNG files are allowed' });
+            if (!file.type.includes('webp') && !file.type.includes('png') && !file.type.includes('jpg') && !file.type.includes('jpeg')) {
+                setMessage({ type: 'error', text: 'Only PNG, WEBP, JPG, and JPEG files are allowed' });
                 return;
             }
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -271,7 +271,7 @@ export default function AdminSettingsPage() {
                                     <input
                                         type="file"
                                         id="logo"
-                                        accept=".png"
+                                        accept=".png, .webp, .jpg, .jpeg"
                                         onChange={(e) => handleFileChange(e, 'logo')}
                                         className="block flex-1 text-xs text-gray-600 dark:text-gray-400 
                                             file:mr-3 file:py-2 file:px-3 
@@ -297,7 +297,7 @@ export default function AdminSettingsPage() {
                                     <input
                                         type="file"
                                         id="textLogo"
-                                        accept=".png"
+                                        accept=".png, .webp, .jpg, .jpeg"
                                         onChange={(e) => handleFileChange(e, 'textLogo')}
                                         className="block flex-1 text-xs text-gray-600 dark:text-gray-400 
                                             file:mr-3 file:py-2 file:px-3 

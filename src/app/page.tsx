@@ -52,7 +52,7 @@ export default function InitialPage() {
                         {/* This part for displaying your logo is fine */}
                         <div className="w-60 bg-white rounded flex items-center justify-center">
                             <Image
-                                src="/uploads/textlogo.png"
+                                src="/uploads/textlogo.webp"
                                 alt="Campaign Illustration"
                                 className="object-contain"
                                 priority
@@ -93,7 +93,7 @@ export default function InitialPage() {
                 <div className="hffidden md:block bg-gray-800 relative">
                     {/* This part for displaying your image is fine */}
                     <Image
-                        src="/uploads/logo.png"
+                        src="/uploads/logo.webp"
                         alt="Campaign Illustration"
                         fill
                         className="object-fill"
