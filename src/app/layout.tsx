@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   title: "Schedular",
   description: "email marketing application",
   icons: {
-    icon: "/uploads/logo.png",
+    icon: "/uploads/logo.webp",
   },
 };
 
@@ -37,8 +37,8 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Preload critical images */}
-        <link rel="preload" as="image" href="/uploads/textlogo.png" />
-        <link rel="preload" as="image" href="/uploads/logo.png" />
+        <link rel="preload" as="image" href="/uploads/textlogo.webp" />
+        <link rel="preload" as="image" href="/uploads/logo.webp" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

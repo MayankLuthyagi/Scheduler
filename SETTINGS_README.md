@@ -12,8 +12,8 @@ This application includes a comprehensive dynamic theme and settings management 
 
 ### 🖼️ Logo Management
 - **Dual Logo Support**: 
-  - Main Logo (`logo.png`)
-  - Text Logo (`textlogo.png`)
+  - Main Logo (`logo.webp`)
+  - Text Logo (`textlogo.webp`)
 - **File Validation**: Only PNG files accepted (max 5MB)
 - **Automatic Replacement**: New uploads replace existing files with same names
 - **Real-time Display**: Updated logos appear immediately across the application
@@ -42,8 +42,8 @@ src/
 │           └── page.tsx           # Admin settings page
 public/
 └── uploads/
-    ├── logo.png                   # Main logo file
-    └── textlogo.png              # Text logo file
+    ├── logo.webp                   # Main logo file
+    └── textlogo.webp              # Text logo file
 ```
 
 ## API Endpoints
@@ -57,8 +57,8 @@ Retrieves current site settings.
   "success": true,
   "settings": {
     "themeColor": "#3b82f6",
-    "textLogo": "textlogo.png",
-    "logo": "logo.png"
+    "textLogo": "textlogo.webp",
+    "logo": "logo.webp"
   }
 }
 ```
@@ -86,8 +86,8 @@ Updates site settings with new values.
 ```typescript
 interface SiteSettings {
   _id?: string;
-  textLogo?: string;     // filename: "textlogo.png"
-  logo?: string;         // filename: "logo.png"
+  textLogo?: string;     // filename: "textlogo.webp"
+  logo?: string;         // filename: "logo.webp"
   themeColor: string;    // hex color: "#3b82f6"
   updatedAt?: Date;
   createdAt?: Date;
@@ -160,8 +160,8 @@ Access the settings through the admin dashboard:
 
 ### Settings Form
 - **Theme Color**: Use color picker or input hex code directly
-- **Main Logo**: Upload PNG file (replaces `logo.png`)
-- **Text Logo**: Upload PNG file (replaces `textlogo.png`)
+- **Main Logo**: Upload PNG file (replaces `logo.webp`)
+- **Text Logo**: Upload PNG file (replaces `textlogo.webp`)
 - **Preview**: Real-time preview of selected colors
 - **Current Assets**: Display of currently uploaded logos
 

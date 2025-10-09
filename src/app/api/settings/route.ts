@@ -103,19 +103,19 @@ export async function POST(request: NextRequest) {
             const textLogoFilename = `textlogo.webp`;
             const textLogoPath = path.join(process.cwd(), 'public', 'uploads', textLogoFilename);
 
-           if (!textLogoFile.type.includes('webp')) {
+            if (!textLogoFile.type.includes('webp')) {
                 // Convert to WebP if not already WebP
                 const buffer = Buffer.from(await textLogoFile.arrayBuffer());
-                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_textlogo.png');
-                
+                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_textlogo.webp');
+
                 // Write temp file
                 await fs.writeFile(tempPath, buffer);
-                
+
                 // Convert to WebP
-                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_textlogo.png', 'textlogo.webp');
-                
+                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_textlogo.webp', 'textlogo.webp');
+
                 // Delete temp file
-                await fs.unlink(tempPath).catch(() => {});
+                await fs.unlink(tempPath).catch(() => { });
             } else {
                 // Already WebP, just save it
                 const textLogoBuffer = Buffer.from(await textLogoFile.arrayBuffer());
@@ -135,16 +135,16 @@ export async function POST(request: NextRequest) {
             if (!logoFile.type.includes('webp')) {
                 // Convert to WebP if not already WebP
                 const buffer = Buffer.from(await logoFile.arrayBuffer());
-                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_logo.png');
-                
+                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_logo.webp');
+
                 // Write temp file
                 await fs.writeFile(tempPath, buffer);
-                
+
                 // Convert to WebP
-                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_logo.png', 'logo.webp');
-                
+                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_logo.webp', 'logo.webp');
+
                 // Delete temp file
-                await fs.unlink(tempPath).catch(() => {});
+                await fs.unlink(tempPath).catch(() => { });
             } else {
                 // Already WebP, just save it
                 const logoBuffer = Buffer.from(await logoFile.arrayBuffer());
