@@ -483,14 +483,17 @@ const useAuthEmails = (isOpen: boolean) => {
 interface CampaignFormProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: CampaignFormData, isEdit?: boolean) => void;
+    onSubmit: (data: CampaignFormData, isEdit?: boolean) => Promise<void> | void;
+    onDelete?: (campaignId: string) => Promise<void> | void;
     editCampaign?: Campaign | null;
+    isDeleting?: boolean;
 }
 
 type Tab = 'content' | 'scheduling' | 'sending';
 
-export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }: CampaignFormProps) {
+export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, editCampaign, isDeleting = false }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const { authEmails, isLoading: emailsLoading } = useAuthEmails(isOpen);
     const { settings } = useTheme();
 
@@ -549,16 +552,45 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
         } else {
             reset(defaultValues);
         }
+        // Close delete confirmation when switching campaigns
+        setShowDeleteConfirm(false);
     }, [editCampaign, reset, defaultValues]);
 
+    // Close delete confirmation when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setShowDeleteConfirm(false);
+        }
+    }, [isOpen]);
 
-    const handleFormSubmit = (data: SlateFormValues) => {
-        // Serialize Slate's format to HTML before submitting
-        const processedData: CampaignFormData = {
-            ...data,
-            emailBody: serializeSlateToHTML(data.emailBody),
-        };
-        onSubmit(processedData, !!editCampaign);
+
+    const handleFormSubmit = async (data: SlateFormValues) => {
+        try {
+            // Serialize Slate's format to HTML before submitting
+            const processedData: CampaignFormData = {
+                ...data,
+                emailBody: serializeSlateToHTML(data.emailBody),
+            };
+            await onSubmit(processedData, !!editCampaign);
+        } catch (error) {
+            console.error('Form submission error:', error);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (editCampaign?.campaignId && onDelete) {
+            try {
+                await onDelete(editCampaign.campaignId);
+                setShowDeleteConfirm(false);
+            } catch (error) {
+                console.error('Delete error:', error);
+                setShowDeleteConfirm(false);
+            }
+        }
+    };
+
+    const confirmDelete = () => {
+        setShowDeleteConfirm(true);
     };
 
     // ... (rest of the component is largely unchanged)
@@ -584,13 +616,28 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col" key={editCampaign?.campaignId || 'new-campaign'}>
+            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col relative" key={editCampaign?.campaignId || 'new-campaign'}>
+                {/* Loading Overlay */}
+                {(isSubmitting || isDeleting) && (
+                    <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10 rounded-lg">
+                        <div className="flex flex-col items-center space-y-3">
+                            <FiLoader className="animate-spin text-4xl" style={{ color: settings.themeColor }} />
+                            <p className="text-lg font-medium text-gray-700">
+                                {isDeleting ? 'Deleting campaign...' : isSubmitting ? 'Saving campaign...' : 'Processing...'}
+                            </p>
+                        </div>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="p-6 border-b flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-800">
                         {editCampaign ? 'Edit Campaign' : 'Create New Campaign'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition cursor-pointer">
+                    <button
+                        onClick={onClose}
+                        disabled={isSubmitting || isDeleting}
+                        className="text-gray-400 hover:text-gray-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         <FiX size={24} />
                     </button>
                 </div>
@@ -779,23 +826,78 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, editCampaign }
                                 </label>
                             )}
                         />
-                        {activeTab === 'sending' && (<div className="flex space-x-4">
-                            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer">Cancel</button>
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="px-5 py-2.5 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:bg-gray-400 cursor-pointer"
-                                style={{
-                                    backgroundColor: isSubmitting ? '#9CA3AF' : settings.themeColor
-                                }}
-                            >
-                                {isSubmitting && <FiLoader className="animate-spin mr-2" />}
-                                {isSubmitting ? 'Saving...' : (editCampaign ? 'Update Campaign' : 'Create Campaign')}
-                            </button>
-                        </div>)}
+                        {activeTab === 'sending' && (
+                            <div className="flex space-x-4">
+                                {editCampaign && onDelete && (
+                                    <button
+                                        type="button"
+                                        onClick={confirmDelete}
+                                        disabled={isDeleting || isSubmitting}
+                                        className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-gray-400 cursor-pointer flex items-center justify-center"
+                                    >
+                                        {isDeleting && <FiLoader className="animate-spin mr-2 h-4 w-4" />}
+                                        {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    disabled={isSubmitting || isDeleting}
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting || isDeleting}
+                                    className="px-5 py-2.5 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:bg-gray-400 cursor-pointer flex items-center justify-center"
+                                    style={{
+                                        backgroundColor: (isSubmitting || isDeleting) ? '#9CA3AF' : settings.themeColor
+                                    }}
+                                >
+                                    {isSubmitting && <FiLoader className="animate-spin mr-2 h-4 w-4" />}
+                                    {isSubmitting ? 'Saving...' : (editCampaign ? 'Update Campaign' : 'Create Campaign')}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </form>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            {showDeleteConfirm && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Campaign</h3>
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete "{editCampaign?.campaignName}"? This action cannot be undone.
+                        </p>
+
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowDeleteConfirm(false)}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium text-white rounded-md hover:opacity-90 disabled:bg-gray-400 flex items-center justify-center min-w-[80px]"
+                                style={{
+                                    backgroundColor: isDeleting ? '#9CA3AF' : '#DC2626'
+                                }}
+                            >
+                                {isDeleting && <FiLoader className="animate-spin mr-2 h-4 w-4" />}
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

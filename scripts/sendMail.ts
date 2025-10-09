@@ -7,10 +7,7 @@ import { validateEmail } from "@/lib/emailValidation";
 import type { SiteSettings } from "@/types/settings";
 import type { Campaign, Attachment } from "@/types/campaign";
 import type { AuthEmail } from "@/types/auth";
-import type { EmailLog } from "@/types/emailLog";
-import Image from 'next/image';
 import "dotenv/config";
-import { string } from "slate";
 
 // Enhanced error categorization
 interface EmailError {
@@ -153,21 +150,35 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
 
         for (const campaign of campaigns) {
             console.log(`\nProcessing campaign: "${campaign.campaignName}" (ID: ${campaign.campaignId})`);
-            const today = new Date();
-            const dayOfWeek = today.toLocaleString("en-US", { weekday: "long" });
+
+            // Get current time in IST (UTC+5:30)
+            const nowUTC = new Date();
+            const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30 in milliseconds
+            const nowIST = new Date(nowUTC.getTime() + istOffset);
+
+            const today = nowIST;
+            // Get day of week using the IST-adjusted date (use UTC methods since we already shifted the time)
+            const dayOfWeek = nowIST.toLocaleString("en-US", { weekday: "long", timeZone: "UTC" });
+
+            console.log(`  - 📅 Current IST day: ${dayOfWeek}, Date: ${nowIST.toISOString().split('T')[0]}`);
 
             // --- Campaign schedule validation ---
             const startDate = new Date(campaign.startDate);
             const endDate = new Date(campaign.endDate);
+            // Compare dates only (without time component)
+            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
             const isCorrectDay = campaign.sendDays.includes(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1));
-            const isWithinDateRange = startDate <= today && endDate >= today;
+            const isWithinDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
             let isAlreadySentToday = false;
             const campaignTodaySent = campaign.todaySent instanceof Date ? campaign.todaySent.toDateString() : new Date(campaign.todaySent).toDateString();
-            if(campaign.todaySent instanceof Date && campaignTodaySent===campaign.createdAt.toDateString()) isAlreadySentToday = false;
+            if (campaign.todaySent instanceof Date && campaignTodaySent === campaign.createdAt.toDateString()) isAlreadySentToday = false;
             else {
                 isAlreadySentToday = campaign.todaySent ?
-                (campaign.todaySent instanceof Date ? campaign.todaySent.toDateString() : new Date(campaign.todaySent).toDateString()) === today.toDateString() :
-                false;
+                    (campaign.todaySent instanceof Date ? campaign.todaySent.toDateString() : new Date(campaign.todaySent).toDateString()) === today.toDateString() :
+                    false;
             }
 
             if (!isCorrectDay || !isWithinDateRange || isAlreadySentToday) {
@@ -180,9 +191,14 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
 
             if (campaign.sendTime) {
                 const [hours, minutes] = campaign.sendTime.split(":").map(Number);
-                const now = new Date();
-                if (now.getHours() < hours || (now.getHours() === hours && now.getMinutes() < minutes)) {
-                    console.log(`  - 🟡 Skipping: Current time is before the scheduled send time of ${campaign.sendTime}.`);
+                // Get current IST hours and minutes
+                const currentISTHours = nowIST.getUTCHours();
+                const currentISTMinutes = nowIST.getUTCMinutes();
+
+                console.log(`  - 🕐 Current IST time: ${currentISTHours}:${currentISTMinutes.toString().padStart(2, '0')}, Scheduled time: ${campaign.sendTime}`);
+
+                if (currentISTHours < hours || (currentISTHours === hours && currentISTMinutes < minutes)) {
+                    console.log(`  - 🟡 Skipping: Current IST time is before the scheduled send time of ${campaign.sendTime}.`);
                     continue;
                 }
             }
@@ -199,7 +215,7 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                 });
                 rows = response.data.values;
             } catch (error) {
-
+                console.error(`  - ❌ Failed to fetch Google Sheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 continue;
             }
 
@@ -209,7 +225,7 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
             }
             console.log(`  - ✔️ Found ${rows.length - 1} potential recipients in the sheet.`);
 
-            if(!campaign.randomSend) {
+            if (!campaign.randomSend) {
                 let globalRecipientIndex = 1;
                 for (const senderEmailAddress of campaign.commaId) {
                     const authEmail = allSenderEmails.find((e) => e.email === senderEmailAddress.trim());
@@ -315,6 +331,7 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                                 `❌ Failed batch from ${authEmail.email}:`,
                                 error.message
                             );
+                            continue; // Skip to next sender
                         }
                     } else {
                         let sentFromThisSender = 0;
@@ -330,20 +347,22 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
 
                             // Validate email before sending
                             const validation = await validateEmail(recipientEmail.trim());
-                            console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
-                            if (await isFeatureAllowed(db, 'emailLogs') && !validation.isValid) {
-                                await db.collection("EmailLog").insertOne({
-                                    _id: logId,
-                                    status: "failed",
-                                    failureReason: `Validation failed: ${validation.reason}`,
-                                    failureCategory: 'validation',
-                                    originalError: validation.reason,
-                                    campaignId: campaign.campaignId,
-                                    recipientEmail: recipientEmail.trim(),
-                                    senderEmail: authEmail.email,
-                                    sendMethod: campaign.sendMethod,
-                                    sentAt: new Date(),
-                                });
+                            if (!validation.isValid) {
+                                console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
+                                if (await isFeatureAllowed(db, 'emailLogs')) {
+                                    await db.collection("EmailLog").insertOne({
+                                        _id: logId,
+                                        status: "failed",
+                                        failureReason: `Validation failed: ${validation.reason}`,
+                                        failureCategory: 'validation',
+                                        originalError: validation.reason,
+                                        campaignId: campaign.campaignId,
+                                        recipientEmail: recipientEmail.trim(),
+                                        senderEmail: authEmail.email,
+                                        sendMethod: campaign.sendMethod,
+                                        sentAt: new Date(),
+                                    });
+                                }
                                 continue;
                             }
 
@@ -380,6 +399,10 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                             try {
                                 await transporter.sendMail(mailOptions);
                                 console.log(`  - ✅ Sent to ${recipientEmail.trim()}`);
+                                // Add delay between individual sends to avoid rate limiting
+                                if (sentFromThisSender < campaign.dailySendLimitPerSender) {
+                                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+                                }
                                 if (await isFeatureAllowed(db, 'emailLogs')) {
                                     await db.collection("EmailLog").insertOne({
                                         _id: logId,
@@ -412,11 +435,17 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                             }
                         }
                     }
+                    transporter.close();
                 }
+
             } else {
                 // Randomly send enabled
-                const shuffledRows = rows.slice(1).sort(() => 0.5 - Math.random());
-                let globalRecipientIndex = 1;
+                const shuffledRows = rows.slice(1);
+                for (let i = shuffledRows.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffledRows[i], shuffledRows[j]] = [shuffledRows[j], shuffledRows[i]];
+                }
+                let globalRecipientIndex = 0;
                 for (const senderEmailAddress of campaign.commaId) {
                     const authEmail = allSenderEmails.find((e) => e.email === senderEmailAddress.trim());
                     if (!authEmail) {
@@ -521,6 +550,7 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                                 `❌ Failed batch from ${authEmail.email}:`,
                                 error.message
                             );
+                            continue; // Skip to next sender
                         }
                     } else {
                         let sentFromThisSender = 0;
@@ -536,20 +566,22 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
 
                             // Validate email before sending
                             const validation = await validateEmail(recipientEmail.trim());
-                            console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
-                            if (await isFeatureAllowed(db, 'emailLogs') && !validation.isValid) {
-                                await db.collection("EmailLog").insertOne({
-                                    _id: logId,
-                                    status: "failed",
-                                    failureReason: `Validation failed: ${validation.reason}`,
-                                    failureCategory: 'validation',
-                                    originalError: validation.reason,
-                                    campaignId: campaign.campaignId,
-                                    recipientEmail: recipientEmail.trim(),
-                                    senderEmail: authEmail.email,
-                                    sendMethod: campaign.sendMethod,
-                                    sentAt: new Date(),
-                                });
+                            if (!validation.isValid) {
+                                console.log(`  - 🚫 Skipping invalid email ${recipientEmail}: ${validation.reason}`);
+                                if (await isFeatureAllowed(db, 'emailLogs')) {
+                                    await db.collection("EmailLog").insertOne({
+                                        _id: logId,
+                                        status: "failed",
+                                        failureReason: `Validation failed: ${validation.reason}`,
+                                        failureCategory: 'validation',
+                                        originalError: validation.reason,
+                                        campaignId: campaign.campaignId,
+                                        recipientEmail: recipientEmail.trim(),
+                                        senderEmail: authEmail.email,
+                                        sendMethod: campaign.sendMethod,
+                                        sentAt: new Date(),
+                                    });
+                                }
                                 continue;
                             }
 
@@ -586,6 +618,10 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                             try {
                                 await transporter.sendMail(mailOptions);
                                 console.log(`  - ✅ Sent to ${recipientEmail.trim()}`);
+                                // Add delay between individual sends to avoid rate limiting
+                                if (sentFromThisSender < campaign.dailySendLimitPerSender) {
+                                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+                                }
                                 if (await isFeatureAllowed(db, 'emailLogs')) {
                                     await db.collection("EmailLog").insertOne({
                                         _id: logId,
@@ -618,13 +654,44 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
                             }
                         }
                     }
+                    transporter.close();
                 }
+
             }
+
             await db.collection("Campaigns").updateOne(
                 { _id: campaign._id },
-                { $set: { todaySent: today.toDateString() } } // Use toDateString to be consistent
+                { $set: { todaySent: todayDateOnly.toDateString() } } // Use toDateString to be consistent
             );
             console.log(`  - 📝 Marked campaign as sent for today.`);
+
+            // Run cleanup for false opens if emailLogs is enabled and campaign is one-on-one
+            if (await isFeatureAllowed(db, 'emailLogs') && campaign.sendMethod === 'one-on-one') {
+                console.log("  - ⏱️ Waiting 10 seconds for bot scans to complete...");
+                await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+
+                console.log("  - 🧹 Cleaning up false opens from this campaign...");
+                try {
+                    const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+                    const response = await fetch(`${baseUrl}/api/analyze-opens?action=cleanup&threshold=10`);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`  - ✅ Cleaned up ${data.cleanedCount} false opens from campaign "${campaign.campaignName}"`);
+                    } else {
+                        console.log("  - ⚠️ Cleanup API responded with error:", response.status);
+                    }
+                } catch (error) {
+                    console.log("  - ⚠️ Could not run cleanup:", error instanceof Error ? error.message : 'Unknown error');
+                }
+            } else {
+                if (!await isFeatureAllowed(db, 'emailLogs')) {
+                    console.log("  - ℹ️ Email logs disabled, skipping cleanup");
+                }
+                if (campaign.sendMethod !== 'one-on-one') {
+                    console.log("  - ℹ️ Campaign uses bulk method, no tracking pixels to clean up");
+                }
+            }
         }
 
         console.log("\n✅ Email job completed successfully!");

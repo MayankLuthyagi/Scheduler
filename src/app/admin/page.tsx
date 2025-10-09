@@ -6,7 +6,14 @@ import DashboardLayout from '@/components/admin/DashboardLayout';
 import SkeletonLoader from '@/components/admin/SkeletonLoader';
 import StatCard from '@/components/admin/StatCard';
 import { useTheme } from '@/contexts/ThemeContext';
-import { FiUsers, FiMail, FiX, FiAlertCircle, FiEdit, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiUsers, FiMail, FiX, FiAlertCircle, FiEdit, FiTrash2, FiPlus, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+
+interface Toast {
+    id: number;
+    message: string;
+    type: 'success' | 'error';
+}
+
 interface AuthUser {
     _id: string;
     name: string;
@@ -38,6 +45,22 @@ export default function AdminDashboardPage() {
     const [userForm, setUserForm] = useState({ name: '', email: '' });
     const [emailForm, setEmailForm] = useState({ name: '', main: '', email: '', app_password: '' });
     const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'user' | 'email', id: string, email: string } | null>(null);
+
+    // Loading states
+    const [isUserSubmitting, setIsUserSubmitting] = useState(false);
+    const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Toast notifications
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(toast => toast.id !== id));
+        }, 5000);
+    };
 
     // User management handlers
     const handleAddUser = () => {
@@ -73,6 +96,7 @@ export default function AdminDashboardPage() {
     };
 
     const handleUserSubmit = async () => {
+        setIsUserSubmitting(true);
         try {
             const url = editingUser ? `/api/authUsers/${editingUser._id}` : '/api/authUsers';
             const method = editingUser ? 'PUT' : 'POST';
@@ -89,13 +113,17 @@ export default function AdminDashboardPage() {
             // Refresh users list
             fetchData();
             setUserModalOpen(false);
+            showToast(editingUser ? 'User updated successfully!' : 'User added successfully!', 'success');
         } catch (error: unknown) {
-            console.error('Error saving user:', error instanceof Error ? error.message : 'An error occurred');
-            // You could show an error notification here
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsUserSubmitting(false);
         }
     };
 
     const handleEmailSubmit = async () => {
+        setIsEmailSubmitting(true);
         try {
             const url = editingEmail ? `/api/authEmails/${editingEmail._id}` : '/api/authEmails';
             const method = editingEmail ? 'PUT' : 'POST';
@@ -112,15 +140,19 @@ export default function AdminDashboardPage() {
             // Refresh emails list
             fetchData();
             setEmailModalOpen(false);
+            showToast(editingEmail ? 'Email updated successfully!' : 'Email added successfully!', 'success');
         } catch (error: unknown) {
-            console.error('Error saving email:', error instanceof Error ? error.message : 'An error occurred');
-            // You could show an error notification here
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsEmailSubmitting(false);
         }
     };
 
     const handleConfirmDelete = async () => {
         if (!deleteConfirm) return;
 
+        setIsDeleting(true);
         try {
             const url = deleteConfirm.type === 'user'
                 ? `/api/authUsers/${deleteConfirm.id}`
@@ -134,9 +166,12 @@ export default function AdminDashboardPage() {
             // Refresh data
             fetchData();
             setDeleteConfirm(null);
+            showToast(`${deleteConfirm.type === 'user' ? 'User' : 'Email'} deleted successfully!`, 'success');
         } catch (error: unknown) {
-            console.error('Error deleting:', error instanceof Error ? error.message : 'An error occurred');
-            // You could show an error notification here
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -285,7 +320,7 @@ export default function AdminDashboardPage() {
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleDeleteUser(user)}
-                                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
                                                                         title="Delete user"
                                                                     >
                                                                         <FiTrash2 className="w-4 h-4" />
@@ -384,6 +419,7 @@ export default function AdminDashboardPage() {
                 userForm={userForm}
                 setUserForm={setUserForm}
                 editingUser={editingUser}
+                isSubmitting={isUserSubmitting}
             />
             <EmailModal
                 isOpen={isEmailModalOpen}
@@ -392,12 +428,40 @@ export default function AdminDashboardPage() {
                 emailForm={emailForm}
                 setEmailForm={setEmailForm}
                 editingEmail={editingEmail}
+                isSubmitting={isEmailSubmitting}
             />
             <DeleteConfirmModal
                 deleteConfirm={deleteConfirm}
                 onClose={() => setDeleteConfirm(null)}
                 onConfirm={handleConfirmDelete}
+                isDeleting={isDeleting}
             />
+
+            {/* Toast Notifications */}
+            <div className="fixed top-4 right-4 z-50 space-y-2">
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-right-full duration-300 ${toast.type === 'success'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-red-500 text-white'
+                            }`}
+                    >
+                        {toast.type === 'success' ? (
+                            <FiCheckCircle className="h-5 w-5" />
+                        ) : (
+                            <FiXCircle className="h-5 w-5" />
+                        )}
+                        <span className="text-sm font-medium">{toast.message}</span>
+                        <button
+                            onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                            className="ml-2 text-white hover:text-gray-200 transition-colors"
+                        >
+                            <FiX className="h-4 w-4" />
+                        </button>
+                    </div>
+                ))}
+            </div>
         </AdminProtectedRoute>
     );
 }
@@ -410,9 +474,10 @@ interface UserModalProps {
     userForm: { name: string; email: string };
     setUserForm: (form: { name: string; email: string }) => void;
     editingUser: AuthUser | null;
+    isSubmitting: boolean;
 }
 
-const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUser }: UserModalProps) => {
+const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUser, isSubmitting }: UserModalProps) => {
     const { settings } = useTheme();
 
     if (!isOpen) return null;
@@ -426,16 +491,16 @@ const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUs
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                         {editingUser ? 'Edit User' : 'Add User'}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 cursor-pointer">
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 cursor-pointer" disabled={isSubmitting}>
                         <FiX />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div>
-                        <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="userName" className="block text-sm font-medium text-black mb-2">
                             Name
                         </label>
                         <input
@@ -446,10 +511,11 @@ const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUs
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter full name"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div>
-                        <label htmlFor="userEmail" className="block text-sm font-medium text-gray-700  mb-2">
+                        <label htmlFor="userEmail" className="block text-sm font-medium text-black mb-2">
                             Email Address
                         </label>
                         <input
@@ -460,22 +526,35 @@ const UserModal = ({ isOpen, onClose, onSubmit, userForm, setUserForm, editingUs
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter email address"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded transition cursor-pointer"
+                            className="px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-200 rounded transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isSubmitting}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 text-white rounded transition cursor-pointer"
+                            className="px-4 py-2 text-white rounded transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             style={{ backgroundColor: settings.themeColor }}
+                            disabled={isSubmitting}
                         >
-                            {editingUser ? 'Update' : 'Add'} User
+                            {isSubmitting ? (
+                                <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    {editingUser ? 'Updating...' : 'Adding...'}
+                                </>
+                            ) : (
+                                <>{editingUser ? 'Update' : 'Add'} User</>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -492,9 +571,10 @@ interface EmailModalProps {
     emailForm: { name: string; main: string; email: string; app_password: string };
     setEmailForm: (form: { name: string; main: string; email: string; app_password: string }) => void;
     editingEmail: AuthEmail | null;
+    isSubmitting: boolean;
 }
 
-const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editingEmail }: EmailModalProps) => {
+const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editingEmail, isSubmitting }: EmailModalProps) => {
     const { settings } = useTheme();
 
     if (!isOpen) return null;
@@ -511,13 +591,13 @@ const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editin
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                         {editingEmail ? 'Edit Email' : 'Add Email'}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 cursor-pointer" disabled={isSubmitting}>
                         <FiX />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div>
-                        <label htmlFor="emailName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="emailName" className="block text-sm font-medium text-black mb-2">
                             Name
                         </label>
                         <input
@@ -528,10 +608,11 @@ const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editin
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter sender name"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div>
-                        <label htmlFor="emailMain" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="emailMain" className="block text-sm font-medium text-black mb-2">
                             Main
                         </label>
                         <input
@@ -542,10 +623,11 @@ const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editin
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter main identifier"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div>
-                        <label htmlFor="emailAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="emailAddress" className="block text-sm font-medium text-black mb-2">
                             Email Address
                         </label>
                         <input
@@ -556,10 +638,11 @@ const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editin
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter email address"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div>
-                        <label htmlFor="appPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="appPassword" className="block text-sm font-medium text-black mb-2">
                             App Password
                         </label>
                         <input
@@ -570,22 +653,35 @@ const EmailModal = ({ isOpen, onClose, onSubmit, emailForm, setEmailForm, editin
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             placeholder="Enter app password"
                             required
+                            disabled={isSubmitting}
                         />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 bg-gray-200 text-gray-800 rounded transition cursor-pointer"
+                            className="px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-200 rounded transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isSubmitting}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 text-white rounded transition cursor-pointer"
+                            className="px-4 py-2 text-white rounded transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             style={{ backgroundColor: settings.themeColor }}
+                            disabled={isSubmitting}
                         >
-                            {editingEmail ? 'Update' : 'Add'} Email
+                            {isSubmitting ? (
+                                <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    {editingEmail ? 'Updating...' : 'Adding...'}
+                                </>
+                            ) : (
+                                <>{editingEmail ? 'Update' : 'Add'} Email</>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -599,9 +695,10 @@ interface DeleteConfirmModalProps {
     deleteConfirm: { type: 'user' | 'email'; id: string; email: string } | null;
     onClose: () => void;
     onConfirm: () => void;
+    isDeleting: boolean;
 }
 
-const DeleteConfirmModal = ({ deleteConfirm, onClose, onConfirm }: DeleteConfirmModalProps) => {
+const DeleteConfirmModal = ({ deleteConfirm, onClose, onConfirm, isDeleting }: DeleteConfirmModalProps) => {
     if (!deleteConfirm) return null;
 
     return (
@@ -611,7 +708,7 @@ const DeleteConfirmModal = ({ deleteConfirm, onClose, onConfirm }: DeleteConfirm
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                         Delete {deleteConfirm.type === 'user' ? 'User' : 'Email'}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 cursor-pointer" disabled={isDeleting}>
                         <FiX />
                     </button>
                 </div>
@@ -630,15 +727,27 @@ const DeleteConfirmModal = ({ deleteConfirm, onClose, onConfirm }: DeleteConfirm
                     <div className="mt-6 flex justify-center gap-4">
                         <button
                             onClick={onClose}
-                            className="px-6 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition"
+                            className="px-6 py-2 bg-gray-200 text-gray-800 dark:text-gray-200 font-medium rounded-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isDeleting}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={onConfirm}
-                            className="px-6 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition"
+                            className="px-6 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+                            disabled={isDeleting}
                         >
-                            Delete
+                            {isDeleting ? (
+                                <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
                         </button>
                     </div>
                 </div>
