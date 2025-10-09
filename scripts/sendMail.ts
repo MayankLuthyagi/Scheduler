@@ -168,8 +168,13 @@ async function isFeatureAllowed(db: Db, feature: keyof SiteSettings['featureAllo
             // --- Campaign schedule validation ---
             const startDate = new Date(campaign.startDate);
             const endDate = new Date(campaign.endDate);
+            // Compare dates only (without time component)
+            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            
             const isCorrectDay = campaign.sendDays.includes(dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1));
-            const isWithinDateRange = startDate <= today && endDate >= today;
+            const isWithinDateRange = startDateOnly <= todayDateOnly && endDateOnly >= todayDateOnly;
             let isAlreadySentToday = false;
             const campaignTodaySent = campaign.todaySent instanceof Date ? campaign.todaySent.toDateString() : new Date(campaign.todaySent).toDateString();
             if (campaign.todaySent instanceof Date && campaignTodaySent === campaign.createdAt.toDateString()) isAlreadySentToday = false;
