@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
+import type { User } from 'firebase/auth';
 
 // --- Custom Hook for Authentication Logic ---
 const useAuth = () => {
@@ -42,11 +41,15 @@ const useAuth = () => {
                 router.push('/dashboard');
             } else {
                 setError('Access Denied. Your email is not authorized.');
+                const { getFirebaseAuth } = await import('@/lib/firebase');
+                const auth = await getFirebaseAuth();
                 await auth.signOut();
             }
         } catch (err) {
             console.error('Authorization check failed:', err);
             setError('Could not verify user permissions. Please check your connection and try again.');
+            const { getFirebaseAuth } = await import('@/lib/firebase');
+            const auth = await getFirebaseAuth();
             await auth.signOut();
         } finally {
             setIsLoading(false);
@@ -59,6 +62,13 @@ const useAuth = () => {
         setError('');
 
         try {
+            // Lazy load Firebase modules
+            const { getFirebaseAuth, getGoogleProvider } = await import('@/lib/firebase');
+            const { signInWithPopup } = await import('firebase/auth');
+
+            const auth = await getFirebaseAuth();
+            const googleProvider = await getGoogleProvider();
+
             await auth.signOut(); // Ensure clean login
             const result = await signInWithPopup(auth, googleProvider);
             await handleSuccessfulSignIn(result.user);
@@ -66,6 +76,13 @@ const useAuth = () => {
             const error = popupError as { code?: string; message?: string };
             if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
                 console.log('Popup failed, falling back to redirect.');
+
+                // Lazy load Firebase for redirect
+                const { getFirebaseAuth, getGoogleProvider } = await import('@/lib/firebase');
+                const { signInWithRedirect } = await import('firebase/auth');
+
+                const auth = await getFirebaseAuth();
+                const googleProvider = await getGoogleProvider();
                 await signInWithRedirect(auth, googleProvider);
             } else {
                 console.error('Google Sign-In Error:', popupError);
@@ -77,19 +94,27 @@ const useAuth = () => {
 
     // Effect to handle the result of a redirect sign-in
     useEffect(() => {
-        getRedirectResult(auth)
-            .then((result) => {
+        async function checkRedirectResult() {
+            try {
+                const { getFirebaseAuth } = await import('@/lib/firebase');
+                const { getRedirectResult } = await import('firebase/auth');
+
+                const auth = await getFirebaseAuth();
+                const result = await getRedirectResult(auth);
+
                 if (result && result.user) {
-                    handleSuccessfulSignIn(result.user);
+                    await handleSuccessfulSignIn(result.user);
                 } else {
                     setIsLoading(false); // No redirect result, stop loading
                 }
-            })
-            .catch((err) => {
+            } catch (err) {
                 console.error('Redirect result error:', err);
                 setError('Failed to process sign-in after redirect.');
                 setIsLoading(false);
-            });
+            }
+        }
+
+        checkRedirectResult();
     }, [handleSuccessfulSignIn]);
 
 
@@ -173,7 +198,7 @@ export default function LoginPage() {
                                 router.push('/admin/login');
                             }
                         }}
-                        className="w-full py-3 px-4 bg-gray-900 hover:bg-black text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 cursor-pointer"
+                        className="w-full py-3 px-4 bg-black text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 cursor-pointer"
                     >
                         Admin Panel Login
                     </button>

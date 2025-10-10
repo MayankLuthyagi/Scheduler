@@ -89,8 +89,7 @@ export default function AdminLoginPage() {
                             required
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            style={{ borderColor: settings.themeColor }}
-                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-opacity-50"
                             placeholder="Enter username"
                         />
                     </div>
@@ -105,8 +104,7 @@ export default function AdminLoginPage() {
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            style={{ borderColor: settings.themeColor }}
-                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                            className="w-full px-3 py-2 border-2 text-black rounded-md focus:outline-none focus:ring-opacity-50"
                             placeholder="Enter password"
                         />
                     </div>
@@ -133,10 +131,10 @@ export default function AdminLoginPage() {
 
                 <div className="mt-6 text-center">
                     <Link
-                        href="/"
+                        href="/login"
                         className="text-sm text-gray-600 hover:text-gray-900 transition duration-200"
                     >
-                        ← Back to main page
+                        ← Back to login page
                     </Link>
                 </div>
             </div>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
-import { ObjectId } from 'mongodb';
 
 // Helper function to add CORS headers
 function addCorsHeaders(response: NextResponse) {

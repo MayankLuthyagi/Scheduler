@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
         <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 transition-theme">
             {/* Sidebar */}
-            <aside className="w-80 bg-gray-800 dark:bg-black text-white flex flex-col transition-theme">
+            <aside className="w-80 bg-black text-white flex flex-col transition-theme">
                 <div className="p-4 text-2xl font-bold border-b border-gray-700 dark:border-gray-600">
                     Schedular Tools
                 </div>

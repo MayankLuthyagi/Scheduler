@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
             sendMethod: formData.get('sendMethod') as string,
             sheetId: formData.get('sheetId') as string,
             isActive: formData.get('isActive') === 'true',
+            randomSend: formData.get('randomSend') === 'true',
             todaySent: new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -133,6 +134,7 @@ export async function PUT(request: NextRequest) {
             sendMethod: formData.get('sendMethod') as string,
             sheetId: formData.get('sheetId') as string,
             isActive: formData.get('isActive') === 'true',
+            randomSend: formData.get('randomSend') === 'true',
             updatedAt: new Date(),
         };
 
