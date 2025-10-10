@@ -870,7 +870,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, edit
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Campaign</h3>
                         <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete "{editCampaign?.campaignName}"? This action cannot be undone.
+                            Are you sure you want to delete {editCampaign?.campaignName}? This action cannot be undone.
                         </p>
 
                         <div className="flex justify-end space-x-3">
