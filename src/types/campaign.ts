@@ -22,6 +22,7 @@ export interface Campaign {
     sheetId: string;
     attachments: Attachment[]; // Store attachments directly in MongoDB
     isActive: boolean;
+    randomSend: boolean;
     todaySent: Date;
     createdAt: Date;
     updatedAt: Date;
@@ -44,4 +45,5 @@ export interface CampaignFormData {
     attachment?: File | null;
     attachmentNote?: string;
     isActive: boolean;
+    randomSend: boolean;
 }

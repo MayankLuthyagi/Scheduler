@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 
 // --- (Place these in separate files for best practice) ---
 // e.g., @/hooks/useCampaigns.ts
@@ -20,8 +19,7 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 // --- Components ---
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
-import { FaPlus, FaTrash } from 'react-icons/fa'; // Example using react-icons
-import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiUsers, FiEye, FiRefreshCw } from 'react-icons/fi';
+import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 // --- Data Fetching Hooks --------------------------------------------------
 
@@ -261,11 +259,13 @@ const Notification = ({ info, onDismiss, themeColor }: { info: NotificationState
 export default function DashboardPage() {
     const { user, logout } = useAuth();
     const { settings, isLoading: themeLoading } = useTheme();
-    const router = useRouter();
 
     // Feature flags
-    const campaignAllowed = useFeatureAllowed('campaign');
+    const emailTemplateAllowed = useFeatureAllowed('emailTemplate');
     const emailLogsAllowed = useFeatureAllowed('emailLogs');
+    const campaignAllowed = useFeatureAllowed('campaign');
+    const oneTimeBroadcastAllowed = useFeatureAllowed('oneTimeBroadcast');
+    const dateBasedAutomationAllowed = useFeatureAllowed('dateBasedAutomation');
 
     // State for UI interactivity
     const [isCampaignFormOpen, setIsCampaignFormOpen] = useState(false);
@@ -275,34 +275,13 @@ export default function DashboardPage() {
     const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
     const [isDeleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
 
-    // Sidebar state - automatically set to first available feature
-    const getDefaultSection = () => {
-        if (campaignAllowed) return 'campaigns';
-        if (emailLogsAllowed) return 'user-analytics';
-        return 'campaigns'; // fallback
-    };
-
-    const [activeSection, setActiveSection] = useState<'campaigns' | 'user-analytics'>(getDefaultSection());
+    // Sidebar state - Dashboard is now the main home page
+    const [activeSection, setActiveSection] = useState<'dashboard' | 'email-templates' | 'campaigns' | 'one-time-broadcast' | 'date-based-automation'>('dashboard');
 
     // Using our custom hooks
     const { campaigns, isLoading: campaignsLoading, addOrUpdateCampaign, deleteCampaign } = useCampaigns();
     const { stats, isLoading: statsLoading } = useDashboardStats();
     const { logs, loading: logsLoading, error: logsError, filter, setFilter, searchTerm, setSearchTerm, page, setPage, totalPages, refresh: refreshLogs, deleteAllLogs } = useEmailLogs();
-
-    // Update active section when features change
-    useEffect(() => {
-        if (!campaignAllowed && !emailLogsAllowed) {
-            // No features enabled, keep current state
-            return;
-        }
-
-        // If current section is not allowed, switch to first available
-        if (activeSection === 'campaigns' && !campaignAllowed) {
-            if (emailLogsAllowed) setActiveSection('user-analytics');
-        } else if (activeSection === 'user-analytics' && !emailLogsAllowed) {
-            if (campaignAllowed) setActiveSection('campaigns');
-        }
-    }, [campaignAllowed, emailLogsAllowed, activeSection]);
 
     if (themeLoading) {
         return (
@@ -379,9 +358,16 @@ export default function DashboardPage() {
                 <Notification info={notification} onDismiss={() => setNotification(null)} themeColor={settings.themeColor} />
 
                 {/* Header */}
-                <header className="bg-white shadow-sm">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <header className="w-full bg-white shadow-sm border-b border-gray-300">
+                    <div className="flex justify-between items-center mx-8 px-10 py-6">
+                        <div style={{ position: 'relative', width: '200px', height: '50px' }}>
+                            <Image
+                                src="/uploads/textlogo.webp"
+                                alt="Logo"
+                                fill
+                                style={{ objectFit: 'contain' }}
+                            />
+                        </div>
                         <div className="flex items-center space-x-4">
                             {user?.photoURL && <Image src={user.photoURL} alt="Profile" width={40} height={40} className="rounded-full" />}
                             <div className="text-right">
@@ -394,42 +380,89 @@ export default function DashboardPage() {
                 </header>
 
                 {/* Main Content with Sidebar */}
-                <div className="flex h-screen bg-gray-50">
+                <div className="flex h-screen bg-gray-50 ">
                     {/* Sidebar */}
-                    <div className="w-64 bg-white shadow-sm border-r border-gray-200">
+                    <div className="w-64 bg-white shadow-sm border-r border-gray-300">
                         <div className="p-4">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Dashboard</h2>
+                            <h2 className="text-lg font-semibold text-gray-900 mb-2">Home</h2>
                             <nav className="space-y-2">
+                                {/* Dashboard - Always visible as main page */}
+                                <button
+                                    onClick={() => setActiveSection('dashboard')}
+                                    className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'dashboard'
+                                        ? 'text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    style={activeSection === 'dashboard' ? { backgroundColor: settings.themeColor } : {}}
+                                >
+                                    <FiBarChart className="w-5 h-5 mr-3" />
+                                    Dashboard
+                                </button>
+
+                                {/* Email Templates */}
+                                {emailTemplateAllowed && (
+                                    <button
+                                        onClick={() => setActiveSection('email-templates')}
+                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'email-templates'
+                                            ? 'text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        style={activeSection === 'email-templates' ? { backgroundColor: settings.themeColor } : {}}
+                                    >
+                                        <FiMail className="w-5 h-5 mr-3" />
+                                        Email Templates
+                                    </button>
+                                )}
+
+                                {/* Campaigns */}
                                 {campaignAllowed && (
                                     <button
                                         onClick={() => setActiveSection('campaigns')}
-                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition ${activeSection === 'campaigns'
+                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'campaigns'
                                             ? 'text-white'
                                             : 'text-gray-600 hover:bg-gray-100'
                                             }`}
                                         style={activeSection === 'campaigns' ? { backgroundColor: settings.themeColor } : {}}
                                     >
-                                        <FiBarChart className="w-5 h-5 mr-3" />
-                                        Campaign
+                                        <FiRefreshCw className="w-5 h-5 mr-3" />
+                                        Campaigns
                                     </button>
                                 )}
-                                {emailLogsAllowed && (
+
+                                {/* One-Time Broadcast */}
+                                {oneTimeBroadcastAllowed && (
                                     <button
-                                        onClick={() => setActiveSection('user-analytics')}
-                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition ${activeSection === 'user-analytics'
+                                        onClick={() => setActiveSection('one-time-broadcast')}
+                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'one-time-broadcast'
                                             ? 'text-white'
                                             : 'text-gray-600 hover:bg-gray-100'
                                             }`}
-                                        style={activeSection === 'user-analytics' ? { backgroundColor: settings.themeColor } : {}}
+                                        style={activeSection === 'one-time-broadcast' ? { backgroundColor: settings.themeColor } : {}}
                                     >
-                                        <FiUsers className="w-5 h-5 mr-3" />
-                                        User Analytics
+                                        <FiMail className="w-5 h-5 mr-3" />
+                                        One-Time Broadcast
                                     </button>
                                 )}
-                                {!campaignAllowed && !emailLogsAllowed && (
+
+                                {/* Date-Based Automation */}
+                                {dateBasedAutomationAllowed && (
+                                    <button
+                                        onClick={() => setActiveSection('date-based-automation')}
+                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'date-based-automation'
+                                            ? 'text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        style={activeSection === 'date-based-automation' ? { backgroundColor: settings.themeColor } : {}}
+                                    >
+                                        <FiRefreshCw className="w-5 h-5 mr-3" />
+                                        Date-Based Automation
+                                    </button>
+                                )}
+
+                                {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && (
                                     <div className="text-center py-8 text-gray-500">
-                                        <p>No features are currently enabled.</p>
-                                        <p className="text-sm mt-2">Contact your administrator to enable features.</p>
+                                        <p className="text-sm">No features enabled.</p>
+                                        <p className="text-xs mt-2">Contact administrator.</p>
                                     </div>
                                 )}
                             </nav>
@@ -439,38 +472,291 @@ export default function DashboardPage() {
                     {/* Main Content Area */}
                     <div className="flex-1 overflow-auto">
                         <div className="p-8">
-                            {/* Campaign Section */}
-                            {campaignAllowed && activeSection === 'campaigns' && (
+                            {/* Dashboard Home - Shows Create Options + Analytics */}
+                            {activeSection === 'dashboard' && (
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Campaign Management</h1>
+                                    {(emailTemplateAllowed || emailLogsAllowed || campaignAllowed || oneTimeBroadcastAllowed || dateBasedAutomationAllowed) && (
+                                        <>
+                                            <h1 className="text-2xl font-bold text-gray-900 mb-8">Dashboard Overview</h1>
+                                            {/* Create Section - Show all enabled features */}
+                                            <div className="mb-8">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {emailTemplateAllowed && (
+                                                        <div
+                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
+                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
+                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
+                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                                                        >
+                                                            <div className="flex flex-col items-center text-center">
+                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
+                                                                    <FiMail className="w-8 h-8" style={{ color: settings.themeColor }} />
+                                                                </div>
+                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Template</h3>
+                                                                <p className="text-sm text-gray-600 mb-4">Create reusable email templates</p>
+                                                                <button
+                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    Create Template
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
 
-                                    {/* Add Campaign Section */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-                                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Campaign</h2>
-                                        <div onClick={() => handleOpenForm()} className="border border-dashed border-gray-300 p-8 rounded-lg flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-500 hover:text-blue-600 transition group">
-                                            <div className="bg-gray-100 p-4 rounded-full group-hover:bg-blue-100 transition" style={{ backgroundColor: `${settings.themeColor}20` }}>
-                                                <FaPlus className="h-8 w-8 text-gray-500 transition" style={{ color: settings.themeColor }} />
+                                                    {campaignAllowed && (
+                                                        <div
+                                                            onClick={() => handleOpenForm()}
+                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
+                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
+                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
+                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                                                        >
+                                                            <div className="flex flex-col items-center text-center">
+                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
+                                                                    <FiRefreshCw className="w-8 h-8" style={{ color: settings.themeColor }} />
+                                                                </div>
+                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Campaign</h3>
+                                                                <p className="text-sm text-gray-600 mb-4">Launch automated campaigns</p>
+                                                                <button
+                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    Create Campaign
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {oneTimeBroadcastAllowed && (
+                                                        <div
+                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
+                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
+                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
+                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                                                        >
+                                                            <div className="flex flex-col items-center text-center">
+                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
+                                                                    <FiMail className="w-8 h-8" style={{ color: settings.themeColor }} />
+                                                                </div>
+                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">One-Time Broadcast</h3>
+                                                                <p className="text-sm text-gray-600 mb-4">Send instant broadcasts</p>
+                                                                <button
+                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    Create Broadcast
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {dateBasedAutomationAllowed && (
+                                                        <div
+                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
+                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
+                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
+                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                                                        >
+                                                            <div className="flex flex-col items-center text-center">
+                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
+                                                                    <FiRefreshCw className="w-8 h-8" style={{ color: settings.themeColor }} />
+                                                                </div>
+                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Date-Based Automation</h3>
+                                                                <p className="text-sm text-gray-600 mb-4">Automate by dates</p>
+                                                                <button
+                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    Create Automation
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <h3 className="mt-4 text-lg font-semibold text-gray-800">Create Campaign</h3>
-                                            <p className="mt-1 text-sm text-gray-500">Launch a new email sequence</p>
+
+                                            {/* User Analytics Section (Email Logs) - Only if enabled */}
+                                            {emailLogsAllowed && (
+                                                <div>
+                                                    <h2 className="text-xl font-semibold text-gray-900 mb-6">User Analytics</h2>
+
+                                                    {/* Today's Stats */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                                        <StatCard
+                                                            title="Today's Sent Mail"
+                                                            value={stats.sent}
+                                                            total={stats.total}
+                                                            percentage={parseFloat(stats.sentPercentage)}
+                                                            isLoading={statsLoading}
+                                                            themeColor={settings.themeColor}
+                                                        />
+                                                        <StatCard
+                                                            title="Today's Opened Mail"
+                                                            value={stats.opened}
+                                                            total={stats.sent}
+                                                            percentage={parseFloat(stats.openRate)}
+                                                            isLoading={statsLoading}
+                                                            note="(One-on-One)"
+                                                            themeColor={settings.themeColor}
+                                                        />
+                                                    </div>
+
+                                                    {/* Email Logs Section */}
+                                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                                        <div className="flex items-center justify-between mb-6">
+                                                            <h3 className="text-lg font-semibold text-gray-900">Email Logs</h3>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={refreshLogs}
+                                                                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    <FiRefreshCw className="w-4 h-4 mr-2" />
+                                                                    Refresh
+                                                                </button>
+                                                                <button
+                                                                    onClick={handleOpenDeleteAllModal}
+                                                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm whitespace-nowrap"
+                                                                >
+                                                                    Delete All
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Filters and Search */}
+                                                        <div className="mb-6 border-b border-gray-200 pb-4">
+                                                            <div className="flex flex-col md:flex-row gap-4">
+                                                                <div className="flex-shrink-0 flex flex-wrap gap-2">
+                                                                    {['all', 'today', 'sent', 'failed', 'opened', 'bounced'].map(f => (
+                                                                        <FilterButton
+                                                                            key={f}
+                                                                            active={filter === f}
+                                                                            onClick={() => setFilter(f as LogFilter)}
+                                                                            themeColor={settings.themeColor}
+                                                                        >
+                                                                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                                                                        </FilterButton>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="flex gap-2 items-center">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Search by recipient, sender, or campaign ID..."
+                                                                        value={searchTerm}
+                                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                                        className="w-full md:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-600"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Email Logs Table */}
+                                                        <div className="overflow-x-auto">
+                                                            {logsLoading && <p className="text-center p-8 text-gray-600">Loading...</p>}
+                                                            {logsError && <p className="text-center p-8 text-red-600">{logsError}</p>}
+                                                            {!logsLoading && !logsError && logs.length === 0 && (
+                                                                <p className="text-center p-8 text-gray-600">No logs found for this filter.</p>
+                                                            )}
+                                                            {!logsLoading && !logsError && logs.length > 0 && (
+                                                                <table className="min-w-full divide-y divide-gray-200">
+                                                                    <thead className="bg-gray-50">
+                                                                        <tr>
+                                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+                                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sender</th>
+                                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent At</th>
+                                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                                        {logs.map((log, index) => (
+                                                                            <tr key={`${log.campaignId}-${log.recipientEmail}-${log.sentAt}-${index}`}>
+                                                                                <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={log.status} /></td>
+                                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.recipientEmail}</td>
+                                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.senderEmail}</td>
+                                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.sentAt).toLocaleString()}</td>
+                                                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                                                    <button
+                                                                                        onClick={() => setSelectedLog(log)}
+                                                                                        className="text-blue-600 hover:text-blue-900"
+                                                                                        title="View Details"
+                                                                                    >
+                                                                                        <FiEye />
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Pagination */}
+                                                        {totalPages > 1 && (
+                                                            <Pagination
+                                                                currentPage={page}
+                                                                totalPages={totalPages}
+                                                                onPageChange={setPage}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Email Templates Page - Show all email templates with edit/delete */}
+                            {activeSection === 'email-templates' && emailTemplateAllowed && (
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Email Templates</h1>
+                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                        <div className="text-center py-12">
+                                            <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
+                                            <p className="text-gray-600 font-semibold">No templates created yet</p>
+                                            <p className="text-gray-500 mb-4">Create your first email template from the dashboard.</p>
                                         </div>
                                     </div>
+                                </div>
+                            )}
 
-                                    {/* Created Campaigns Section */}
+                            {/* Campaigns Page - Show all campaigns with edit/delete */}
+                            {activeSection === 'campaigns' && campaignAllowed && (
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Campaigns</h1>
                                     <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <h2 className="text-xl font-semibold text-gray-900 mb-6">Active Campaigns ({campaigns.length})</h2>
                                         {campaignsLoading ? (
-                                            <div className="text-center py-8 text-gray-500">Loading campaigns...</div>
+                                            <p className="text-center p-8 text-gray-600">Loading...</p>
                                         ) : campaigns.length === 0 ? (
                                             <div className="text-center py-12">
-                                                <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
-                                                <p className="text-gray-600 font-semibold">No campaigns here yet</p>
-                                                <p className="text-gray-500 mb-4">Click the button above to get started.</p>
+                                                <FiRefreshCw className="text-gray-300 text-5xl mx-auto mb-4" />
+                                                <p className="text-gray-600 font-semibold">No campaigns created yet</p>
+                                                <p className="text-gray-500 mb-4">Create your first campaign from the dashboard.</p>
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                {campaigns.map(campaign => (
-                                                    <CampaignCard key={campaign.campaignId} campaign={campaign} onEdit={() => handleOpenForm(campaign)} onDelete={(e) => openDeleteConfirm(campaign, e)} themeColor={settings.themeColor} />
+                                                {campaigns.map((campaign) => (
+                                                    <div key={campaign.campaignId} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
+                                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{campaign.campaignName}</h3>
+                                                        <p className="text-sm text-gray-600 mb-4">Created: {new Date(campaign.createdAt).toLocaleDateString()}</p>
+                                                        <div className="flex space-x-2">
+                                                            <button
+                                                                onClick={() => handleOpenForm(campaign)}
+                                                                className="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                style={{ backgroundColor: settings.themeColor }}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => openDeleteConfirm(campaign, e)}
+                                                                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
@@ -478,119 +764,36 @@ export default function DashboardPage() {
                                 </div>
                             )}
 
-                            {/* User Analytics Section (Email Logs) */}
-                            {emailLogsAllowed && activeSection === 'user-analytics' && (
+                            {/* One-Time Broadcast Page */}
+                            {activeSection === 'one-time-broadcast' && oneTimeBroadcastAllowed && (
                                 <div>
-                                    {/* Today's Stats */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                        <StatCard
-                                            title="Today's Sent Mail"
-                                            value={stats.sent}
-                                            total={stats.total}
-                                            percentage={parseFloat(stats.sentPercentage)}
-                                            isLoading={statsLoading}
-                                            themeColor={settings.themeColor}
-                                        />
-                                        <StatCard
-                                            title="Today's Opened Mail"
-                                            value={stats.opened}
-                                            total={stats.sent}
-                                            percentage={parseFloat(stats.openRate)}
-                                            isLoading={statsLoading}
-                                            note="(One-on-One)"
-                                            themeColor={settings.themeColor}
-                                        />
-                                    </div>
-
-                                    {/* Email Logs Section */}
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">One-Time Broadcast</h1>
                                     <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h2 className="text-xl font-semibold text-gray-900">Email Logs</h2>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={refreshLogs}
-                                                    className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
-                                                    style={{ backgroundColor: settings.themeColor }}
-                                                >
-                                                    <FiRefreshCw className="w-4 h-4 mr-2" />
-                                                    Refresh
-                                                </button>
-                                                <button
-                                                    onClick={handleOpenDeleteAllModal}
-                                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm whitespace-nowrap"
-                                                >
-                                                    Delete All
-                                                </button>
-                                            </div>
-                                        </div>                                    {/* Filters and Search */}
-                                        <div className="mb-6 border-b border-gray-200 pb-4">
-                                            <div className="flex flex-col md:flex-row gap-4">
-                                                <div className="flex-shrink-0 flex flex-wrap gap-2">
-                                                    {['all', 'today', 'sent', 'failed', 'opened', 'bounced'].map(f => (
-                                                        <FilterButton key={f} active={filter === f} onClick={() => setFilter(f as LogFilter)} themeColor={settings.themeColor}>
-                                                            {f.charAt(0).toUpperCase() + f.slice(1)}
-                                                        </FilterButton>
-                                                    ))}
-                                                </div>
-                                                <div className="flex gap-2 items-center">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search by recipient, sender, or campaign ID..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                        className="w-full md:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-600"
-                                                    />
-                                                </div>
-                                            </div>
+                                        <div className="text-center py-12">
+                                            <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
+                                            <p className="text-gray-600 font-semibold">No broadcasts created yet</p>
+                                            <p className="text-gray-500 mb-4">Create your first broadcast from the dashboard.</p>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
 
-                                        {/* Email Logs Table */}
-                                        <div className="overflow-x-auto">
-                                            {logsLoading && <p className="text-center p-8 text-gray-600">Loading...</p>}
-                                            {logsError && <p className="text-center p-8 text-red-600">{logsError}</p>}
-                                            {!logsLoading && !logsError && logs.length === 0 && <p className="text-center p-8 text-gray-600">No logs found for this filter.</p>}
-                                            {!logsLoading && !logsError && logs.length > 0 && (
-                                                <table className="min-w-full divide-y divide-gray-200">
-                                                    <thead className="bg-gray-50">
-                                                        <tr>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sender</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent At</th>
-                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white divide-y divide-gray-200">
-                                                        {logs.map((log, index) => (
-                                                            <tr key={`${log.campaignId}-${log.recipientEmail}-${log.sentAt}-${index}`}>
-                                                                <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={log.status} /></td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.recipientEmail}</td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.senderEmail}</td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.sentAt).toLocaleString()}</td>
-                                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                                    <button
-                                                                        onClick={() => setSelectedLog(log)}
-                                                                        className="text-blue-600 hover:text-blue-900"
-                                                                        title="View Details"
-                                                                    >
-                                                                        <FiEye />
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            )}
+                            {/* Date-Based Automation Page */}
+                            {activeSection === 'date-based-automation' && dateBasedAutomationAllowed && (
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Date-Based Automation</h1>
+                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                        <div className="text-center py-12">
+                                            <FiRefreshCw className="text-gray-300 text-5xl mx-auto mb-4" />
+                                            <p className="text-gray-600 font-semibold">No automations created yet</p>
+                                            <p className="text-gray-500 mb-4">Create your first automation from the dashboard.</p>
                                         </div>
-
-                                        {/* Pagination */}
-                                        {totalPages > 1 && <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />}
                                     </div>
                                 </div>
                             )}
 
                             {/* No Features Enabled Fallback */}
-                            {!campaignAllowed && !emailLogsAllowed && (
+                            {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && (
                                 <div className="flex items-center justify-center h-96">
                                     <div className="text-center">
                                         <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -599,22 +802,18 @@ export default function DashboardPage() {
                                         <h2 className="text-xl font-semibold text-gray-900 mb-2">No Features Available</h2>
                                         <p className="text-gray-600 mb-4 max-w-md">
                                             No dashboard features are currently enabled for your account.
-                                            Please contact your administrator to enable Campaign or Email Logs features.
+                                            Please contact your administrator to enable features.
                                         </p>
-                                        <button
-                                            onClick={logout}
-                                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition"
-                                        >
-                                            Sign Out
-                                        </button>
                                     </div>
                                 </div>
                             )}
 
                             {/* Feature Disabled Message */}
-                            {((activeSection === 'campaigns' && !campaignAllowed) ||
-                                (activeSection === 'user-analytics' && !emailLogsAllowed)) &&
-                                (campaignAllowed || emailLogsAllowed) && (
+                            {((activeSection === 'email-templates' && !emailTemplateAllowed) ||
+                                (activeSection === 'campaigns' && !campaignAllowed) ||
+                                (activeSection === 'one-time-broadcast' && !oneTimeBroadcastAllowed) ||
+                                (activeSection === 'date-based-automation' && !dateBasedAutomationAllowed)) &&
+                                (emailTemplateAllowed || campaignAllowed || emailLogsAllowed || oneTimeBroadcastAllowed || dateBasedAutomationAllowed) && (
                                     <div className="flex items-center justify-center h-96">
                                         <div className="text-center">
                                             <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -719,25 +918,6 @@ const StatCard = ({ title, value, total, percentage, isLoading, note, onClick, t
         </div>
     );
 };
-
-const CampaignCard = ({ campaign, onEdit, onDelete, themeColor }: { campaign: Campaign, onEdit: () => void, onDelete: (e: React.MouseEvent) => void, themeColor: string }) => (
-    <div onClick={onEdit} className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:shadow-md transition-all cursor-pointer relative group" style={{ '--hover-border-color': themeColor } as React.CSSProperties} onMouseEnter={(e) => e.currentTarget.style.borderColor = themeColor} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}>
-        <button onClick={onDelete} className="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition opacity-0 group-hover:opacity-100 z-10" title="Delete Campaign">
-            <FaTrash className="h-4 w-4" />
-        </button>
-        <div className="pr-8">
-            <h3 className="font-semibold text-gray-900 truncate">{campaign.campaignName}</h3>
-            <p className="text-sm text-gray-600 truncate">{campaign.emailSubject}</p>
-        </div>
-        <div className={`mt-3 px-2 py-1 inline-block rounded-full text-xs font-medium`} style={campaign.isActive ? { backgroundColor: `${themeColor}20`, color: themeColor } : { backgroundColor: '#fef2f2', color: '#dc2626' }}>
-            {campaign.isActive ? 'Active' : 'Inactive'}
-        </div>
-        <div className="text-xs text-gray-500 mt-3 border-t pt-3">
-            <div>📅 {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}</div>
-            <div>🕒 {campaign.sendTime} on {campaign.sendDays.slice(0, 2).join(', ')}{campaign.sendDays.length > 2 ? `...` : ''}</div>
-        </div>
-    </div>
-);
 
 interface DeleteConfirmationModalProps {
     campaignName: string;

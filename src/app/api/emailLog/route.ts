@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
     try {
         const { db } = await connectToDatabase();
         const collection: Collection = db.collection('EmailLog');
