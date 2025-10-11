@@ -3,7 +3,7 @@ import path from "path";
 import sharp from "sharp";
 
 export async function convertPngToWebp(
-  inputDir = "./images", 
+  inputDir = "./images",
   outputDir = "./webp",
   inputFile?: string,
   outputFile?: string
@@ -38,5 +38,14 @@ export async function convertPngToWebp(
 
       console.log(`Converted: ${file} → ${outputPath}`);
     }
-  } 
+  }
+}
+
+// Convert a Buffer (in-memory file) to WebP and write to outputPath
+export async function convertBufferToWebp(
+  buffer: Buffer,
+  outputPath: string,
+  quality = 80
+) {
+  await sharp(buffer).webp({ quality }).toFile(outputPath);
 }

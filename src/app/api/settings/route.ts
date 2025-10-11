@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import { SiteSettings } from '@/types/settings';
 import path from 'path';
 import fs from 'fs/promises';
-import { convertPngToWebp } from "@/lib/optimiser";
+import { convertBufferToWebp } from '@/lib/optimiser';
 export async function GET() {
     try {
         const { db } = await connectToDatabase();
@@ -98,29 +98,18 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date()
         };
 
+        // Ensure uploads directory exists
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+        await fs.mkdir(uploadsDir, { recursive: true }).catch(() => { });
+
         // Handle text logo upload
         if (textLogoFile && textLogoFile.size > 0) {
             const textLogoFilename = `textlogo.webp`;
-            const textLogoPath = path.join(process.cwd(), 'public', 'uploads', textLogoFilename);
+            const textLogoPath = path.join(uploadsDir, textLogoFilename);
 
-            if (!textLogoFile.type.includes('webp')) {
-                // Convert to WebP if not already WebP
-                const buffer = Buffer.from(await textLogoFile.arrayBuffer());
-                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_textlogo.webp');
-
-                // Write temp file
-                await fs.writeFile(tempPath, buffer);
-
-                // Convert to WebP
-                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_textlogo.webp', 'textlogo.webp');
-
-                // Delete temp file
-                await fs.unlink(tempPath).catch(() => { });
-            } else {
-                // Already WebP, just save it
-                const textLogoBuffer = Buffer.from(await textLogoFile.arrayBuffer());
-                await fs.writeFile(textLogoPath, textLogoBuffer);
-            }
+            const buffer = Buffer.from(await textLogoFile.arrayBuffer());
+            // Use shared optimiser helper to convert buffer to webp
+            await convertBufferToWebp(buffer, textLogoPath, 80);
 
             updatedSettings.textLogo = textLogoFilename;
         } else if (existingSettings?.textLogo) {
@@ -130,26 +119,11 @@ export async function POST(request: NextRequest) {
         // Handle main logo upload
         if (logoFile && logoFile.size > 0) {
             const logoFilename = `logo.webp`;
-            const logoPath = path.join(process.cwd(), 'public', 'uploads', logoFilename);
+            const logoPath = path.join(uploadsDir, logoFilename);
 
-            if (!logoFile.type.includes('webp')) {
-                // Convert to WebP if not already WebP
-                const buffer = Buffer.from(await logoFile.arrayBuffer());
-                const tempPath = path.join(process.cwd(), 'public', 'uploads', 'temp_logo.webp');
-
-                // Write temp file
-                await fs.writeFile(tempPath, buffer);
-
-                // Convert to WebP
-                await convertPngToWebp(path.join(process.cwd(), 'public', 'uploads'), path.join(process.cwd(), 'public', 'uploads'), 'temp_logo.webp', 'logo.webp');
-
-                // Delete temp file
-                await fs.unlink(tempPath).catch(() => { });
-            } else {
-                // Already WebP, just save it
-                const logoBuffer = Buffer.from(await logoFile.arrayBuffer());
-                await fs.writeFile(logoPath, logoBuffer);
-            }
+            const buffer = Buffer.from(await logoFile.arrayBuffer());
+            // Use shared optimiser helper to convert buffer to webp
+            await convertBufferToWebp(buffer, logoPath, 80);
 
             updatedSettings.logo = logoFilename;
         } else if (existingSettings?.logo) {
