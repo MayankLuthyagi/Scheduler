@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
 
         const attachment = formData.get('attachment') as File | null;
         if (attachment && attachment.size > 0) {
-            // Check file size limit (1MB)
-            const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
+            // Check file size limit (5MB)
+            const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
             if (attachment.size > maxSize) {
                 return NextResponse.json(
-                    { error: 'File size must be less than 1MB' },
+                    { error: 'File size must be less than 5MB' },
                     { status: 400 }
                 );
             }
