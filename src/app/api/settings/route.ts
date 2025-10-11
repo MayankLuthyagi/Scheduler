@@ -3,6 +3,9 @@ import { connectToDatabase } from '@/lib/db';
 import { SiteSettings } from '@/types/settings';
 import path from 'path';
 import fs from 'fs/promises';
+import os from 'os';
+// Force Node runtime for this route so native modules (sharp) are supported in production
+export const runtime = 'nodejs';
 import { convertBufferToWebp } from '@/lib/optimiser';
 export async function GET() {
     try {
@@ -98,8 +101,13 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date()
         };
 
-        // Ensure uploads directory exists
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+        // Determine a writable uploads directory.
+        // On Vercel (serverless) the project filesystem is readonly — use os.tmpdir() there.
+        const isVercel = !!process.env.VERCEL;
+        const uploadsDir = isVercel
+            ? path.join(os.tmpdir(), 'schedular-uploads')
+            : path.join(process.cwd(), 'public', 'uploads');
+
         await fs.mkdir(uploadsDir, { recursive: true }).catch(() => { });
 
         // Handle text logo upload
@@ -148,8 +156,13 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error('Error updating settings:', error);
+
+        // Return more detailed error information in non-production to help debugging.
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = process.env.NODE_ENV !== 'production' && error instanceof Error ? error.stack : undefined;
+
         return NextResponse.json(
-            { success: false, message: 'Failed to update settings' },
+            { success: false, message: 'Failed to update settings', error: errorMessage, stack: errorStack },
             { status: 500 }
         );
     }
