@@ -269,7 +269,7 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
             console.log(`Found ${rows.length - 1} potential recipients in the sheet.`);
 
             // Get Base URL for unsubscribe links/pixels
-            const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+            const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://schedular-plum.vercel.app').replace(/\/$/, '');
 
             if (!campaign.randomSend) {
                 let globalRecipientIndex = 1;
@@ -975,7 +975,7 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
 
                 console.log("Cleaning up false opens from this campaign...");
                 try {
-                    const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+                    const baseUrl = (process.env.TRACKING_PIXEL_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://schedular-plum.vercel.app').replace(/\/$/, '');
                     const response = await fetch(`${baseUrl}/api/analyze-opens?action=cleanup&threshold=10`);
 
                     if (response.ok) {
