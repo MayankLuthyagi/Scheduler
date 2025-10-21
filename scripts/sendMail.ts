@@ -296,7 +296,7 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
                         // Batch sending logic for BCC/CC
                         
                         const ENV_MAX = Number(process.env.MAX_BCC_BATCH) || 50;
-                        const BATCH_DELAY_MS = Number(process.env.BCC_BATCH_DELAY_MS) || 8000;
+                        const BATCH_DELAY_MS = Number(process.env.BCC_BATCH_DELAY_MS) || 60000;
 
                         const startOfDay = new Date();
                         startOfDay.setHours(0, 0, 0, 0);
@@ -645,7 +645,7 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
                         // Batch sending logic for BCC/CC (RANDOM)
                         
                         const ENV_MAX = Number(process.env.MAX_BCC_BATCH) || 50;
-                        const BATCH_DELAY_MS = Number(process.env.BCC_BATCH_DELAY_MS) || 8000;
+                        const BATCH_DELAY_MS = Number(process.env.BCC_BATCH_DELAY_MS) || 60000;
 
                         const startOfDay = new Date();
                         startOfDay.setHours(0, 0, 0, 0);
