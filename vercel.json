@@ -1,7 +1,3 @@
 {
-  "functions": {
-    "api/**/*.ts": {
-      "regions": ["bom1"]
-    }
-  }
+  "regions": ["bom1"]
 }
