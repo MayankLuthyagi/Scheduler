@@ -10,7 +10,7 @@
     "send:mail": "ts-node scripts/sendMail.ts"
   },
   "dependencies": {
-    "@next/bundle-analyzer": "^15.5.4",
+    "@next/bundle-analyzer": "^15.5.7",
     "@types/uuid": "^11.0.0",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
@@ -19,10 +19,10 @@
     "firebase": "^12.3.0",
     "googleapis": "^161.0.0",
     "mongodb": "^6.20.0",
-    "next": "15.5.4",
+    "next": "15.5.7",
     "nodemailer": "^7.0.6",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
     "react-google-recaptcha": "^3.1.0",
     "react-hook-form": "^7.64.0",
     "react-icons": "^5.5.0",
@@ -41,7 +41,7 @@
     "@types/react-dom": "^19.2.2",
     "@types/react-google-recaptcha": "^2.1.9",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "15.5.7",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5"
