@@ -12,7 +12,7 @@ const useAuth = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true); // Start true to handle redirect check
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'localhost:3000/api';
 
     const handleSuccessfulSignIn = useCallback(async (user: User) => {
         setIsLoading(true);

@@ -10,6 +10,7 @@ import Image from 'next/image';
 
 // --- Types (assuming they are in @/types/) ---
 import { CampaignFormData, Campaign } from '@/types/campaign';
+import { BroadcastFormData, Broadcast } from '@/types/broadcast';
 import { EmailLog } from '@/types/emailLog';
 
 // --- Context ---
@@ -19,6 +20,7 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 // --- Components ---
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
+import BroadcastForm from '@/components/BroadcastForm';
 import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
 
 // --- Data Fetching Hooks --------------------------------------------------
@@ -90,6 +92,73 @@ const useCampaigns = () => {
     };
 
     return { campaigns, isLoading, error, addOrUpdateCampaign, deleteCampaign, refresh: fetchCampaigns };
+};
+
+/**
+ * Custom hook to manage broadcasts and API interactions (one-time broadcasts)
+ */
+const useBroadcasts = () => {
+    const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchBroadcasts = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/broadcasts');
+            if (!res.ok) throw new Error('Failed to fetch broadcasts');
+            const data = await res.json();
+            setBroadcasts(data);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
+            setBroadcasts([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { fetchBroadcasts(); }, [fetchBroadcasts]);
+
+    const addOrUpdateBroadcast = async (broadcastData: BroadcastFormData, editingBroadcast: Broadcast | null) => {
+        const formData = new FormData();
+        Object.entries(broadcastData).forEach(([key, value]) => {
+            if (key === 'attachment' && value) {
+                formData.append(key, value as File);
+            } else if (Array.isArray(value)) {
+                formData.append(key, JSON.stringify(value));
+            } else if (value !== null && value !== undefined) {
+                // sendDate should be serialized as ISO string
+                if (key === 'sendDate' && value instanceof Date) {
+                    formData.append(key, value.toISOString());
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
+        });
+
+        if (editingBroadcast) {
+            // Use /api/broadcasts/{id} PUT
+            const res = await fetch(`/api/broadcasts/${editingBroadcast.broadcastId}`, { method: 'PUT', body: formData });
+            if (!res.ok) return { success: false, error: (await res.json()).error || 'Failed to update broadcast' };
+            await fetchBroadcasts();
+            return { success: true };
+        } else {
+            const res = await fetch('/api/broadcasts', { method: 'POST', body: formData });
+            if (!res.ok) return { success: false, error: (await res.json()).error || 'Failed to create broadcast' };
+            await fetchBroadcasts();
+            return { success: true };
+        }
+    };
+
+    const deleteBroadcast = async (broadcastId: string) => {
+        const res = await fetch(`/api/broadcasts/${broadcastId}`, { method: 'DELETE' });
+        if (!res.ok) return { success: false, error: (await res.json()).error || 'Failed to delete broadcast' };
+        await fetchBroadcasts();
+        return { success: true };
+    };
+
+    return { broadcasts, isLoading, error, addOrUpdateBroadcast, deleteBroadcast, refresh: fetchBroadcasts };
 };
 
 /**
@@ -280,8 +349,12 @@ export default function DashboardPage() {
 
     // Using our custom hooks
     const { campaigns, isLoading: campaignsLoading, addOrUpdateCampaign, deleteCampaign } = useCampaigns();
+    const broadcastsHook = useBroadcasts();
     const { stats, isLoading: statsLoading } = useDashboardStats();
     const { logs, loading: logsLoading, error: logsError, filter, setFilter, searchTerm, setSearchTerm, page, setPage, totalPages, refresh: refreshLogs, deleteAllLogs } = useEmailLogs();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editing, setEditing] = useState<Broadcast | null>(null);
+    const openNew = () => { setEditing(null); setIsModalOpen(true); };
 
     if (themeLoading) {
         return (
@@ -542,6 +615,7 @@ export default function DashboardPage() {
                                                                 <h3 className="text-lg font-semibold text-gray-900 mb-2">One-Time Broadcast</h3>
                                                                 <p className="text-sm text-gray-600 mb-4">Send instant broadcasts</p>
                                                                 <button
+                                                                    onClick={openNew}
                                                                     className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
                                                                     style={{ backgroundColor: settings.themeColor }}
                                                                 >
@@ -766,16 +840,7 @@ export default function DashboardPage() {
 
                             {/* One-Time Broadcast Page */}
                             {activeSection === 'one-time-broadcast' && oneTimeBroadcastAllowed && (
-                                <div>
-                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">One-Time Broadcast</h1>
-                                    <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <div className="text-center py-12">
-                                            <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
-                                            <p className="text-gray-600 font-semibold">No broadcasts created yet</p>
-                                            <p className="text-gray-500 mb-4">Create your first broadcast from the dashboard.</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                <OneTimeBroadcastSection broadcastsHook={broadcastsHook} settings={settings} onEdit={(b: Broadcast) => { setEditing(b); setIsModalOpen(true); }} />
                             )}
 
                             {/* Date-Based Automation Page */}
@@ -862,9 +927,84 @@ export default function DashboardPage() {
                         )}
                     </>
                 )}
+
+                {oneTimeBroadcastAllowed && (
+                    <>
+                        {isModalOpen && (
+                            <BroadcastForm
+                                isOpen={true}
+                                onClose={() => { setIsModalOpen(false); setEditing(null); }}
+                                editBroadcast={editing || undefined}
+                                onSubmit={async (data) => {
+                                    const res = await broadcastsHook.addOrUpdateBroadcast(data, editing);
+                                    if (res.success) {
+                                        showNotification(editing ? 'Broadcast updated' : 'Broadcast created', 'success');
+                                        setIsModalOpen(false);
+                                        setEditing(null);
+                                    } else {
+                                        showNotification(res.error || 'Failed to save broadcast', 'error');
+                                    }
+                                }}
+                                onDelete={async (broadcastId: string) => {
+                                    const res = await broadcastsHook.deleteBroadcast(broadcastId);
+                                    if (res.success) {
+                                        showNotification('Broadcast deleted', 'success');
+                                        setIsModalOpen(false);
+                                        setEditing(null);
+                                    } else {
+                                        showNotification(res.error || 'Failed to delete broadcast', 'error');
+                                    }
+                                }}
+                                isDeleting={false}
+                            />
+                        )}
+                    </>
+                )}
+
             </div>
         </ProtectedRoute>
     );
+}
+
+// Helper component for One-Time Broadcasts section
+function OneTimeBroadcastSection({ broadcastsHook, settings, onEdit }: { broadcastsHook: ReturnType<typeof useBroadcasts>, settings: any, onEdit: (b: Broadcast) => void }) {
+    return (
+        <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">One-Time Broadcast</h1>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+                {broadcastsHook.isLoading ? (
+                    <p>Loading...</p>
+                ) : broadcastsHook.error ? (
+                    <p className="text-red-600">{broadcastsHook.error}</p>
+                ) : broadcastsHook.broadcasts.length === 0 ? (
+                    <div className="text-center py-12">
+                        <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
+                        <p className="text-gray-600 font-semibold">No broadcasts created yet</p>
+                        <p className="text-gray-500 mb-4">Create your first broadcast from the dashboard.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {broadcastsHook.broadcasts.map(b => (
+                            <div key={b.broadcastId} className="p-3 border rounded flex items-center justify-between">
+                                <div>
+                                    <div className="font-medium">{b.broadcastName}</div>
+                                    <div className="text-sm text-gray-600">{b.emailSubject}</div>
+                                    <div className="text-sm text-gray-500">Send at: {new Date(b.sendDate).toLocaleString()}</div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <button className="btn btn-sm" onClick={() => onEdit(b)}>Edit</button>
+                                    <button className="btn btn-sm btn-danger" onClick={async () => { await broadcastsHook.deleteBroadcast(b.broadcastId); }}>Delete</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+        </div>
+
+    );
+
 }
 
 // --- Sub-components for better organization --------------------------------
