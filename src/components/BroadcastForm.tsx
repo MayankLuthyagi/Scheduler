@@ -519,7 +519,7 @@ export default function BroadcastForm({ isOpen, onClose, onSubmit, onDelete, edi
     }), []);
 
     // Note the updated type for emailBody
-    const { register, handleSubmit, control, watch, reset, formState: { isSubmitting }, getValues } = useForm<SlateFormValues>({
+    const { register, handleSubmit, control, watch, reset, formState: { isSubmitting } } = useForm<SlateFormValues>({
         defaultValues,
     });
 

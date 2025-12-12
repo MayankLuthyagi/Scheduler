@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
     try {
         // Support both JSON PUT and formData PUT (for file attachments)
-        let updateData: Record<string, any> = { updatedAt: new Date() };
+        const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
         const contentType = request.headers.get('content-type') || '';
         if (contentType.includes('multipart/form-data')) {
@@ -74,7 +74,9 @@ export async function PUT(request: NextRequest) {
             allowed.forEach(k => {
                 if (k in body) updateData[k] = body[k];
             });
-            if (updateData.sendDate) updateData.sendDate = new Date(updateData.sendDate);
+            if (updateData.sendDate && typeof updateData.sendDate === 'string') {
+                updateData.sendDate = new Date(updateData.sendDate);
+            }
 
             const { db } = await connectToDatabase();
             const result = await db.collection('Broadcasts').updateOne({ broadcastId: id }, { $set: updateData });

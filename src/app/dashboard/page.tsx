@@ -840,7 +840,7 @@ export default function DashboardPage() {
 
                             {/* One-Time Broadcast Page */}
                             {activeSection === 'one-time-broadcast' && oneTimeBroadcastAllowed && (
-                                <OneTimeBroadcastSection broadcastsHook={broadcastsHook} settings={settings} onEdit={(b: Broadcast) => { setEditing(b); setIsModalOpen(true); }} />
+                                <OneTimeBroadcastSection broadcastsHook={broadcastsHook} onEdit={(b: Broadcast) => { setEditing(b); setIsModalOpen(true); }} />
                             )}
 
                             {/* Date-Based Automation Page */}
@@ -967,7 +967,7 @@ export default function DashboardPage() {
 }
 
 // Helper component for One-Time Broadcasts section
-function OneTimeBroadcastSection({ broadcastsHook, settings, onEdit }: { broadcastsHook: ReturnType<typeof useBroadcasts>, settings: any, onEdit: (b: Broadcast) => void }) {
+function OneTimeBroadcastSection({ broadcastsHook, onEdit }: { broadcastsHook: ReturnType<typeof useBroadcasts>, onEdit: (b: Broadcast) => void }) {
     return (
         <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">One-Time Broadcast</h1>

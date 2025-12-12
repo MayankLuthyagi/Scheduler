@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
+import bundleAnalyzer from '@next/bundle-analyzer';
+// Allow a loose type here because the bundle analyzer export shape isn't typed for our setup
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const withBundleAnalyzer = (bundleAnalyzer as any)({
   enabled: process.env.ANALYZE === 'true',
 });
 

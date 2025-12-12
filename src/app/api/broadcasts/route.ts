@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     try {
         const formData = await request.formData();
 
-        const broadcastData: Record<string, any> = {
+        const broadcastData: Record<string, unknown> = {
             broadcastId: uuidv4(),
             broadcastName: formData.get('broadcastName') as string,
             emailSubject: formData.get('emailSubject') as string,
