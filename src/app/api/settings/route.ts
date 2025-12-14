@@ -28,6 +28,7 @@ export async function GET() {
                         campaign: false,
                         oneTimeBroadcast: false,
                         dateBasedAutomation: false,
+                        attachment: false,
                     },
                 }
             });
@@ -46,6 +47,7 @@ export async function GET() {
                     campaign: false,
                     oneTimeBroadcast: false,
                     dateBasedAutomation: false,
+                    attachment: false,
                 }
             }
         });
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
             campaign: formData.get('campaign') === 'true',
             oneTimeBroadcast: formData.get('oneTimeBroadcast') === 'true',
             dateBasedAutomation: formData.get('dateBasedAutomation') === 'true',
+            attachment: formData.get('attachment') === 'true',
         };
 
         if (!themeColor) {

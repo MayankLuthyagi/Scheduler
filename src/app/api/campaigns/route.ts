@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
         };
 
         const attachment = formData.get('attachment') as File | null;
+        // If file attachment provided, use it. Otherwise check for existingAttachment reference.
+        const existingAttachmentRef = formData.get('existingAttachment') as string | null;
         if (attachment && attachment.size > 0) {
             // Check file size limit (1MB)
             const maxSize = 1 * 1024 * 1024; // 1 MB in bytes
@@ -50,6 +52,22 @@ export async function POST(request: NextRequest) {
                 contentType: attachment.type,
                 note: formData.get('attachmentNote') as string || ''
             }];
+        } else if (existingAttachmentRef) {
+            try {
+                const parsed = JSON.parse(existingAttachmentRef as string);
+                const collection = parsed.source === 'broadcast' ? 'Broadcasts' : 'Campaigns';
+                const ownerId = parsed.ownerId;
+                const idx = parseInt(String(parsed.index), 10) || 0;
+                const { db } = await connectToDatabase();
+                const owner = await db.collection(collection).findOne(parsed.source === 'broadcast' ? { broadcastId: ownerId } : { campaignId: ownerId });
+                if (owner && owner.attachments && owner.attachments[idx]) {
+                    campaignData.attachments = [owner.attachments[idx]];
+                } else {
+                    campaignData.attachments = [];
+                }
+            } catch (err) {
+                campaignData.attachments = [];
+            }
         } else {
             campaignData.attachments = [];
         }
@@ -140,6 +158,7 @@ export async function PUT(request: NextRequest) {
 
         // Handle file attachment if present
         const attachment = formData.get('attachment') as File | null;
+        const existingAttachmentRef = formData.get('existingAttachment') as string | null;
         if (attachment && attachment.size > 0) {
             // Check file size limit (5MB)
             const maxSize = 5 * 1024 * 1024; // 5MB in bytes

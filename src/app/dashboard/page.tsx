@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { CampaignFormData, Campaign } from '@/types/campaign';
 import { BroadcastFormData, Broadcast } from '@/types/broadcast';
 import { EmailLog } from '@/types/emailLog';
+import { Attachment, AttachmentFormData } from '@/types/attachment';
 
 // --- Context ---
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +22,8 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
 import BroadcastForm from '@/components/BroadcastForm';
-import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
+import AttachmentForm from '@/components/AttachmentForm';
+import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw, FiPaperclip, FiTrash2 } from 'react-icons/fi';
 
 // --- Data Fetching Hooks --------------------------------------------------
 
@@ -295,6 +297,70 @@ const useEmailLogs = () => {
     };
 };
 
+/**
+ * Custom hook to manage attachments and API interactions.
+ */
+const useAttachments = () => {
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchAttachments = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/attachments');
+            if (!response.ok) throw new Error('Failed to fetch attachments.');
+            const data = await response.json();
+            setAttachments(data.attachments || []);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAttachments();
+    }, [fetchAttachments]);
+
+    const addAttachment = async (attachmentData: AttachmentFormData) => {
+        const formData = new FormData();
+        formData.append('name', attachmentData.name);
+        if (attachmentData.file) {
+            formData.append('file', attachmentData.file);
+        }
+
+        try {
+            const response = await fetch('/api/attachments', { method: 'POST', body: formData });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create attachment.');
+            }
+            await fetchAttachments(); // Refresh data on success
+            return { success: true };
+        } catch (err: unknown) {
+            return { success: false, error: err instanceof Error ? err.message : 'An error occurred' };
+        }
+    };
+
+    const deleteAttachment = async (attachmentId: string) => {
+        try {
+            const response = await fetch(`/api/attachments?attachmentId=${attachmentId}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete attachment.');
+            }
+            await fetchAttachments(); // Refresh data on success
+            return { success: true };
+        } catch (err: unknown) {
+            return { success: false, error: err instanceof Error ? err.message : 'An error occurred' };
+        }
+    };
+
+    return { attachments, isLoading, error, addAttachment, deleteAttachment, refresh: fetchAttachments };
+};
+
 
 // --- UI Components --------------------------------------------------------
 
@@ -335,6 +401,7 @@ export default function DashboardPage() {
     const campaignAllowed = useFeatureAllowed('campaign');
     const oneTimeBroadcastAllowed = useFeatureAllowed('oneTimeBroadcast');
     const dateBasedAutomationAllowed = useFeatureAllowed('dateBasedAutomation');
+    const attachmentAllowed = useFeatureAllowed('attachment');
 
     // State for UI interactivity
     const [isCampaignFormOpen, setIsCampaignFormOpen] = useState(false);
@@ -345,15 +412,18 @@ export default function DashboardPage() {
     const [isDeleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
 
     // Sidebar state - Dashboard is now the main home page
-    const [activeSection, setActiveSection] = useState<'dashboard' | 'email-templates' | 'campaigns' | 'one-time-broadcast' | 'date-based-automation'>('dashboard');
+    const [activeSection, setActiveSection] = useState<'dashboard' | 'campaigns' | 'one-time-broadcast' | 'date-based-automation' | 'attachment'>('dashboard');
 
     // Using our custom hooks
     const { campaigns, isLoading: campaignsLoading, addOrUpdateCampaign, deleteCampaign } = useCampaigns();
     const broadcastsHook = useBroadcasts();
     const { stats, isLoading: statsLoading } = useDashboardStats();
     const { logs, loading: logsLoading, error: logsError, filter, setFilter, searchTerm, setSearchTerm, page, setPage, totalPages, refresh: refreshLogs, deleteAllLogs } = useEmailLogs();
+    const attachmentsHook = useAttachments();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editing, setEditing] = useState<Broadcast | null>(null);
+    const [isAttachmentFormOpen, setIsAttachmentFormOpen] = useState(false);
+    const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null);
     const openNew = () => { setEditing(null); setIsModalOpen(true); };
 
     if (themeLoading) {
@@ -425,9 +495,30 @@ export default function DashboardPage() {
         setDeleteAllModalOpen(false);
     };
 
+    const handleAttachmentSubmit = async (data: AttachmentFormData) => {
+        const result = await attachmentsHook.addAttachment(data);
+        if (result.success) {
+            showNotification('Attachment uploaded successfully!', 'success');
+            setIsAttachmentFormOpen(false);
+        } else {
+            showNotification(result.error || 'Failed to upload attachment.', 'error');
+        }
+    };
+
+    const handleDeleteAttachment = async () => {
+        if (!attachmentToDelete) return;
+        const result = await attachmentsHook.deleteAttachment(attachmentToDelete.attachmentId);
+        if (result.success) {
+            showNotification('Attachment deleted successfully!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to delete attachment.', 'error');
+        }
+        setAttachmentToDelete(null);
+    };
+
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50">
+            <div className="h-full bg-gray-50">
                 <Notification info={notification} onDismiss={() => setNotification(null)} themeColor={settings.themeColor} />
 
                 {/* Header */}
@@ -472,20 +563,7 @@ export default function DashboardPage() {
                                     Dashboard
                                 </button>
 
-                                {/* Email Templates */}
-                                {emailTemplateAllowed && (
-                                    <button
-                                        onClick={() => setActiveSection('email-templates')}
-                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'email-templates'
-                                            ? 'text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                            }`}
-                                        style={activeSection === 'email-templates' ? { backgroundColor: settings.themeColor } : {}}
-                                    >
-                                        <FiMail className="w-5 h-5 mr-3" />
-                                        Email Templates
-                                    </button>
-                                )}
+                                {/* Email Templates removed */}
 
                                 {/* Campaigns */}
                                 {campaignAllowed && (
@@ -532,7 +610,22 @@ export default function DashboardPage() {
                                     </button>
                                 )}
 
-                                {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && (
+                                {/* Attachment */}
+                                {attachmentAllowed && (
+                                    <button
+                                        onClick={() => setActiveSection('attachment')}
+                                        className={`w-full flex items-center px-4 py-2 text-left rounded-lg transition cursor-pointer ${activeSection === 'attachment'
+                                            ? 'text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        style={activeSection === 'attachment' ? { backgroundColor: settings.themeColor } : {}}
+                                    >
+                                        <FiPaperclip className="w-5 h-5 mr-3" />
+                                        Attachment
+                                    </button>
+                                )}
+
+                                {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && !attachmentAllowed && (
                                     <div className="text-center py-8 text-gray-500">
                                         <p className="text-sm">No features enabled.</p>
                                         <p className="text-xs mt-2">Contact administrator.</p>
@@ -554,28 +647,7 @@ export default function DashboardPage() {
                                             {/* Create Section - Show all enabled features */}
                                             <div className="mb-8">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                    {emailTemplateAllowed && (
-                                                        <div
-                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
-                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
-                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
-                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                                                        >
-                                                            <div className="flex flex-col items-center text-center">
-                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
-                                                                    <FiMail className="w-8 h-8" style={{ color: settings.themeColor }} />
-                                                                </div>
-                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Template</h3>
-                                                                <p className="text-sm text-gray-600 mb-4">Create reusable email templates</p>
-                                                                <button
-                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
-                                                                    style={{ backgroundColor: settings.themeColor }}
-                                                                >
-                                                                    Create Template
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                    {/* Email Template card removed */}
 
                                                     {campaignAllowed && (
                                                         <div
@@ -643,6 +715,31 @@ export default function DashboardPage() {
                                                                     style={{ backgroundColor: settings.themeColor }}
                                                                 >
                                                                     Create Automation
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {attachmentAllowed && (
+                                                        <div
+                                                            onClick={() => setActiveSection('attachment')}
+                                                            className="bg-white p-6 rounded-lg shadow-sm border-2 border-gray-200 hover:border-current cursor-pointer transition-all group"
+                                                            style={{ '--hover-border-color': settings.themeColor } as React.CSSProperties}
+                                                            onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.themeColor}
+                                                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+                                                        >
+                                                            <div className="flex flex-col items-center text-center">
+                                                                <div className="p-4 rounded-full mb-4" style={{ backgroundColor: `${settings.themeColor}20` }}>
+                                                                    <FiPaperclip className="w-8 h-8" style={{ color: settings.themeColor }} />
+                                                                </div>
+                                                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Attachment</h3>
+                                                                <p className="text-sm text-gray-600 mb-4">Manage your attachments</p>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setIsAttachmentFormOpen(true); }}
+                                                                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                                    style={{ backgroundColor: settings.themeColor }}
+                                                                >
+                                                                    Add Attachment
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -782,19 +879,7 @@ export default function DashboardPage() {
                                 </div>
                             )}
 
-                            {/* Email Templates Page - Show all email templates with edit/delete */}
-                            {activeSection === 'email-templates' && emailTemplateAllowed && (
-                                <div>
-                                    <h1 className="text-2xl font-bold text-gray-900 mb-8">Email Templates</h1>
-                                    <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <div className="text-center py-12">
-                                            <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
-                                            <p className="text-gray-600 font-semibold">No templates created yet</p>
-                                            <p className="text-gray-500 mb-4">Create your first email template from the dashboard.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Email Templates page removed */}
 
                             {/* Campaigns Page - Show all campaigns with edit/delete */}
                             {activeSection === 'campaigns' && campaignAllowed && (
@@ -857,8 +942,75 @@ export default function DashboardPage() {
                                 </div>
                             )}
 
+                            {/* Attachment Page */}
+                            {activeSection === 'attachment' && attachmentAllowed && (
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-4">Attachments</h1>
+                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900">Manage Attachments</h3>
+                                            <button
+                                                onClick={() => setIsAttachmentFormOpen(true)}
+                                                className="flex items-center px-4 py-2 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                style={{ backgroundColor: settings.themeColor }}
+                                            >
+                                                <FiPaperclip className="w-4 h-4 mr-2" />
+                                                Add Attachment
+                                            </button>
+                                        </div>
+
+                                        {attachmentsHook.isLoading ? (
+                                            <p className="text-center p-8 text-gray-600">Loading...</p>
+                                        ) : attachmentsHook.error ? (
+                                            <p className="text-center p-8 text-red-600">{attachmentsHook.error}</p>
+                                        ) : attachmentsHook.attachments.length === 0 ? (
+                                            <div className="text-center py-12">
+                                                <FiPaperclip className="text-gray-300 text-5xl mx-auto mb-4" />
+                                                <p className="text-gray-600 font-semibold">No attachments uploaded yet</p>
+                                                <p className="text-gray-500 mb-4">Upload your first attachment to use in campaigns and broadcasts.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full divide-y divide-gray-200">
+                                                    <thead className="bg-gray-50">
+                                                        <tr>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                        {attachmentsHook.attachments.map((attachment) => (
+                                                            <tr key={attachment.attachmentId}>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{attachment.name}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{attachment.filename}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{attachment.contentType}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{(attachment.size / 1024).toFixed(2)} KB</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(attachment.createdAt).toLocaleDateString()}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                                    <button
+                                                                        onClick={() => setAttachmentToDelete(attachment)}
+                                                                        className="text-red-600 hover:text-red-900"
+                                                                        title="Delete Attachment"
+                                                                    >
+                                                                        <FiTrash2 />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* No Features Enabled Fallback */}
-                            {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && (
+                            {!emailTemplateAllowed && !emailLogsAllowed && !campaignAllowed && !oneTimeBroadcastAllowed && !dateBasedAutomationAllowed && !attachmentAllowed && (
                                 <div className="flex items-center justify-center h-96">
                                     <div className="text-center">
                                         <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -874,11 +1026,11 @@ export default function DashboardPage() {
                             )}
 
                             {/* Feature Disabled Message */}
-                            {((activeSection === 'email-templates' && !emailTemplateAllowed) ||
-                                (activeSection === 'campaigns' && !campaignAllowed) ||
+                            {((activeSection === 'campaigns' && !campaignAllowed) ||
                                 (activeSection === 'one-time-broadcast' && !oneTimeBroadcastAllowed) ||
-                                (activeSection === 'date-based-automation' && !dateBasedAutomationAllowed)) &&
-                                (emailTemplateAllowed || campaignAllowed || emailLogsAllowed || oneTimeBroadcastAllowed || dateBasedAutomationAllowed) && (
+                                (activeSection === 'date-based-automation' && !dateBasedAutomationAllowed) ||
+                                (activeSection === 'attachment' && !attachmentAllowed)) &&
+                                (campaignAllowed || emailLogsAllowed || oneTimeBroadcastAllowed || dateBasedAutomationAllowed || attachmentAllowed) && (
                                     <div className="flex items-center justify-center h-96">
                                         <div className="text-center">
                                             <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -956,6 +1108,24 @@ export default function DashboardPage() {
                                     }
                                 }}
                                 isDeleting={false}
+                            />
+                        )}
+                    </>
+                )}
+
+                {attachmentAllowed && (
+                    <>
+                        <AttachmentForm
+                            isOpen={isAttachmentFormOpen}
+                            onClose={() => setIsAttachmentFormOpen(false)}
+                            onSubmit={handleAttachmentSubmit}
+                        />
+
+                        {attachmentToDelete && (
+                            <DeleteAttachmentModal
+                                attachmentName={attachmentToDelete.name}
+                                onConfirm={handleDeleteAttachment}
+                                onCancel={() => setAttachmentToDelete(null)}
                             />
                         )}
                     </>
@@ -1293,6 +1463,37 @@ const DeleteAllLogsModal = ({ onConfirm, onClose }: DeleteAllLogsModalProps) => 
                 </button>
                 <button onClick={onConfirm} className="px-6 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700">
                     Delete All
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+// Delete Attachment Confirmation Modal
+interface DeleteAttachmentModalProps {
+    attachmentName: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+const DeleteAttachmentModal = ({ attachmentName, onConfirm, onCancel }: DeleteAttachmentModalProps) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <FiAlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mt-5">Delete Attachment</h3>
+                <p className="text-sm text-gray-500 mt-2">
+                    Are you sure you want to delete &quot;{attachmentName}&quot;? This action cannot be undone.
+                </p>
+            </div>
+            <div className="mt-6 flex justify-center gap-4">
+                <button onClick={onCancel} className="px-6 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button onClick={onConfirm} className="px-6 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700">
+                    Delete
                 </button>
             </div>
         </div>

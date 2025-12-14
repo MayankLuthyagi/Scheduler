@@ -515,8 +515,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, edit
         toEmail: '',
         replyToEmail: '',
         sheetId: '',
-        attachment: null,
-        attachmentNote: '',
+        attachmentIds: [],
         randomSend: false,
         isActive: true,
     }), []);
@@ -525,6 +524,26 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, edit
     const { register, handleSubmit, control, watch, reset, formState: { isSubmitting } } = useForm<SlateFormValues>({
         defaultValues,
     });
+
+    const [uploadedAttachments, setUploadedAttachments] = useState<Array<{ attachmentId: string; name: string; filename: string; contentType: string; size: number }>>([]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const fetchAttachments = async () => {
+            try {
+                const res = await fetch('/api/attachments');
+                const data = await res.json();
+                if (data.success && Array.isArray(data.attachments)) {
+                    setUploadedAttachments(data.attachments);
+                } else {
+                    setUploadedAttachments([]);
+                }
+            } catch (err) {
+                setUploadedAttachments([]);
+            }
+        };
+        fetchAttachments();
+    }, [isOpen]);
 
     // Populate form with data when editing
     useEffect(() => {
@@ -543,8 +562,7 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, edit
                 toEmail: editCampaign.toEmail || '',
                 replyToEmail: editCampaign.replyToEmail || '',
                 sheetId: editCampaign.sheetId || '',
-                attachment: null, // Always null since we can't pre-populate file inputs
-                attachmentNote: editCampaign.attachments?.[0]?.note || '',
+                attachmentIds: [],
                 isActive: editCampaign.isActive !== undefined ? editCampaign.isActive : true,
                 randomSend: editCampaign.randomSend || false,
             };
@@ -774,28 +792,40 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, edit
                                         placeholder="Optional: Enter Google Sheet ID"
                                     />
                                     <Controller
-                                        name="attachment"
+                                        name="attachmentIds"
                                         control={control}
-                                        render={({ field: { onChange } }) => (
+                                        render={({ field }) => (
                                             <div key={`attachment-${editCampaign?.campaignId || 'new'}`}>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
-                                                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                                                    <div className="space-y-1 text-center">
-                                                        <FiUploadCloud className="mx-auto h-12 w-12 text-gray-400" />
-                                                        <div className="flex text-sm text-gray-600">
-                                                            <label htmlFor="attachment-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
-                                                                <span>Upload a file</span>
-                                                                <input id="attachment-upload" name="attachment-upload" type="file" className="sr-only" onChange={e => onChange(e.target.files?.[0] ?? null)} />
-                                                            </label>
-                                                            <p className="pl-1">or drag and drop</p>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Attachments (Select Multiple)</label>
+                                                <select
+                                                    multiple
+                                                    value={field.value}
+                                                    onChange={(e) => {
+                                                        const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                                                        field.onChange(selectedOptions);
+                                                    }}
+                                                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
+                                                >
+                                                    {uploadedAttachments.map(a => (
+                                                        <option key={a.attachmentId} value={a.attachmentId}>
+                                                            {a.name} ({a.filename})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple attachments</p>
+                                                {field.value && field.value.length > 0 && (
+                                                    <div className="mt-2">
+                                                        <p className="text-sm font-medium text-gray-700">Selected ({field.value.length}):</p>
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {field.value.map(id => {
+                                                                const att = uploadedAttachments.find(a => a.attachmentId === id);
+                                                                return att ? (
+                                                                    <span key={id} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                                                        {att.name}
+                                                                    </span>
+                                                                ) : null;
+                                                            })}
                                                         </div>
-                                                        <p className="text-xs text-gray-500">PDF, PNG, JPG, CSV, XLS up to 10MB</p>
-                                                    </div>
-                                                </div>
-                                                {watch('attachment') && <div className="mt-2 text-sm text-gray-700 flex items-center justify-between bg-gray-100 p-2 rounded"><span>{watch('attachment')?.name}</span> <button type="button" onClick={() => onChange(null)}><FiTrash2 className="text-red-500" /></button></div>}
-                                                {editCampaign && editCampaign.attachments?.length > 0 && !watch('attachment') && (
-                                                    <div className="mt-2 text-sm text-blue-600">
-                                                        Existing attachment: {editCampaign.attachments[0].filename}
                                                     </div>
                                                 )}
                                             </div>

@@ -4,11 +4,9 @@ import { useState, useEffect } from 'react';
 import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 import DashboardLayout from '@/components/admin/DashboardLayout';
 import { SiteSettings } from '@/types/settings';
-import { useTheme } from '@/contexts/ThemeContext';
 import { FiSave } from 'react-icons/fi';
 import Image from 'next/image';
 export default function AdminSettingsPage() {
-    const { settings: themeSettings, refreshSettings, toggleThemeMode } = useTheme();
     const [settings, setSettings] = useState<SiteSettings>({
         themeColor: '#000000',
         themeMode: 'light',
@@ -20,11 +18,11 @@ export default function AdminSettingsPage() {
             campaign: false,
             oneTimeBroadcast: false,
             dateBasedAutomation: false,
+            attachment: false,
         }
     });
     const [formData, setFormData] = useState({
         themeColor: '#000000',
-        themeMode: 'light' as 'light' | 'dark',
         textLogo: null as File | null,
         logo: null as File | null,
         featureAllowed: {
@@ -33,6 +31,7 @@ export default function AdminSettingsPage() {
             campaign: false,
             oneTimeBroadcast: false,
             dateBasedAutomation: false,
+            attachment: false,
         },
     });
     const [loading, setLoading] = useState(true);
@@ -43,15 +42,7 @@ export default function AdminSettingsPage() {
         fetchSettings();
     }, []);
 
-    useEffect(() => {
-        if (themeSettings) {
-            setFormData(prev => ({
-                ...prev,
-                themeColor: themeSettings.themeColor,
-                themeMode: themeSettings.themeMode || 'light'
-            }));
-        }
-    }, [themeSettings]);
+
 
     const fetchSettings = async () => {
         try {
@@ -62,7 +53,6 @@ export default function AdminSettingsPage() {
                 setSettings(data.settings);
                 setFormData({
                     themeColor: data.settings.themeColor,
-                    themeMode: data.settings.themeMode || 'light',
                     textLogo: null,
                     logo: null,
                     featureAllowed: {
@@ -71,6 +61,7 @@ export default function AdminSettingsPage() {
                         campaign: data.settings.featureAllowed?.campaign ?? false,
                         oneTimeBroadcast: data.settings.featureAllowed?.oneTimeBroadcast ?? false,
                         dateBasedAutomation: data.settings.featureAllowed?.dateBasedAutomation ?? false,
+                        attachment: data.settings.featureAllowed?.attachment ?? false,
                     }
                 });
             }
@@ -114,13 +105,7 @@ export default function AdminSettingsPage() {
         }));
     };
 
-    const handleThemeModeChange = async (mode: 'light' | 'dark') => {
-        setFormData(prev => ({ ...prev, themeMode: mode }));
-        if (mode !== themeSettings.themeMode) {
-            await toggleThemeMode();
-            await refreshSettings();
-        }
-    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -130,7 +115,8 @@ export default function AdminSettingsPage() {
         try {
             const submitFormData = new FormData();
             submitFormData.append('themeColor', formData.themeColor);
-            submitFormData.append('themeMode', formData.themeMode);
+            // Always send a valid themeMode to satisfy backend validation
+            submitFormData.append('themeMode', 'light');
 
             if (formData.textLogo) {
                 submitFormData.append('textLogo', formData.textLogo);
@@ -145,6 +131,7 @@ export default function AdminSettingsPage() {
             submitFormData.append('campaign', String(formData.featureAllowed.campaign));
             submitFormData.append('oneTimeBroadcast', String(formData.featureAllowed.oneTimeBroadcast));
             submitFormData.append('dateBasedAutomation', String(formData.featureAllowed.dateBasedAutomation));
+            submitFormData.append('attachment', String(formData.featureAllowed.attachment));
 
             const response = await fetch('/api/settings', {
                 method: 'POST',
@@ -239,28 +226,7 @@ export default function AdminSettingsPage() {
                                 </div>
                             </div>
 
-                            {/* Theme Mode */}
-                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                                <label htmlFor="theme-mode-toggle" className="flex items-center justify-between cursor-pointer">
-                                    <span className="text-sm font-medium text-black">
-                                        {themeSettings?.themeMode === 'dark' ? 'Dark Mode' : 'Light Mode'}
-                                    </span>
-                                    <div className="relative">
-                                        <input
-                                            id="theme-mode-toggle"
-                                            type="checkbox"
-                                            className="sr-only"
-                                            checked={themeSettings?.themeMode === 'dark'}
-                                            onChange={() => handleThemeModeChange(themeSettings?.themeMode === 'dark' ? 'light' : 'dark')}
-                                        />
-                                        <div
-                                            className={`block w-12 h-6 rounded-full transition-colors ${themeSettings?.themeMode === 'dark' ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
-                                            style={themeSettings?.themeMode === 'dark' ? { backgroundColor: formData.themeColor } : {}}
-                                        ></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${themeSettings?.themeMode === 'dark' ? 'transform translate-x-6' : ''}`}></div>
-                                    </div>
-                                </label>
-                            </div>
+                            {/* Theme Mode removed */}
 
                             {/* Main Logo */}
                             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -420,6 +386,27 @@ export default function AdminSettingsPage() {
                                             style={formData.featureAllowed?.dateBasedAutomation ? { backgroundColor: formData.themeColor } : {}}
                                         ></div>
                                         <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.dateBasedAutomation ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Attachment Toggle */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <label htmlFor="attachment-toggle" className="flex items-center justify-between cursor-pointer">
+                                    <span className="text-sm font-medium text-black">Attachment</span>
+                                    <div className="relative">
+                                        <input
+                                            id="attachment-toggle"
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={formData.featureAllowed?.attachment ?? false}
+                                            onChange={() => handleFeatureToggle('attachment')}
+                                        />
+                                        <div
+                                            className={`block w-12 h-6 rounded-full transition-colors ${formData.featureAllowed?.attachment ? '' : 'bg-gray-400 dark:bg-gray-500'}`}
+                                            style={formData.featureAllowed?.attachment ? { backgroundColor: formData.themeColor } : {}}
+                                        ></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.featureAllowed?.attachment ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                 </label>
                             </div>

@@ -103,6 +103,17 @@ export default function InitialPage() {
                     />
                 </div>
             </div>
+            {/* FOOTER — BOTTOM RIGHT */}
+            <div className="absolute bottom-4 right-4 flex items-center gap-2 text-black text-sm">
+                <Image
+                    src="/assets/mayank.png"
+                    alt="Mayank"
+                    width={32}
+                    height={32}
+                    className="rounded-full opacity-80 border border-black"
+                />
+                <span>Made by Mayank</span>
+            </div>
         </div>
     );
 }
