@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         };
 
         const attachment = formData.get('attachment') as File | null;
+        const existingAttachmentRef = formData.get('existingAttachment') as string | null;
         if (attachment && attachment.size > 0) {
             // Allow larger attachment for broadcasts (10MB)
             const maxSize = 10 * 1024 * 1024; // 10 MB
@@ -41,6 +42,22 @@ export async function POST(request: NextRequest) {
                 contentType: attachment.type,
                 note: formData.get('attachmentNote') as string || ''
             }];
+        } else if (existingAttachmentRef) {
+            try {
+                const parsed = JSON.parse(existingAttachmentRef as string);
+                const collection = parsed.source === 'campaign' ? 'Campaigns' : 'Broadcasts';
+                const ownerId = parsed.ownerId;
+                const idx = parseInt(String(parsed.index), 10) || 0;
+                const { db } = await connectToDatabase();
+                const owner = await db.collection(collection).findOne(parsed.source === 'campaign' ? { campaignId: ownerId } : { broadcastId: ownerId });
+                if (owner && owner.attachments && owner.attachments[idx]) {
+                    broadcastData.attachments = [owner.attachments[idx]];
+                } else {
+                    broadcastData.attachments = [];
+                }
+            } catch (err) {
+                broadcastData.attachments = [];
+            }
         } else {
             broadcastData.attachments = [];
         }

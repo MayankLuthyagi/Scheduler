@@ -34,7 +34,6 @@ export interface BroadcastFormData {
     toEmail: string;
     replyToEmail: string;
     sheetId: string;
-    attachment?: File | null;
-    attachmentNote?: string;
+    attachmentIds: string[]; // Array of attachment IDs from database
     randomSend: boolean;
 }

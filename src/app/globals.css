@@ -58,7 +58,7 @@ html:not(.dark) .border-gray-200 {
 }
 
 html:not(.dark) .border-gray-700 {
-  border-color: #374151 !important;
+  border-color: #e5e7eb !important;
 }
 
 /* Dark mode */
@@ -68,15 +68,15 @@ html:not(.dark) .border-gray-700 {
 }
 
 .dark .bg-white {
-  background-color: #374151 !important;
+  background-color: #4d525b !important;
 }
 
 .dark .bg-gray-100 {
-  background-color: #1f2937 !important;
+  background-color: #161616 !important;
 }
 
 .dark .bg-gray-50 {
-  background-color: #111827 !important;
+  background-color: #161616 !important;
 }
 
 .dark .bg-gray-800 {
@@ -99,9 +99,9 @@ html:not(.dark) .border-gray-700 {
 }
 
 .dark .border-gray-200 {
-  border-color: #4b5563 !important;
+  border-color: #f9fafb !important;
 }
 
 .dark .border-gray-700 {
-  border-color: #6b7280 !important;
+  border-color: #f9fafb !important;
 }

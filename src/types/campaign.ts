@@ -42,8 +42,7 @@ export interface CampaignFormData {
     toEmail: string;
     replyToEmail: string;
     sheetId: string;
-    attachment?: File | null;
-    attachmentNote?: string;
+    attachmentIds: string[]; // Array of attachment IDs from database
     isActive: boolean;
     randomSend: boolean;
 }
