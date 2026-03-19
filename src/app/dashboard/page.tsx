@@ -20,7 +20,7 @@ import { useTheme, useFeatureAllowed } from '@/contexts/ThemeContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CampaignForm from '@/components/CampaignForm';
 import { FiMail, FiCheckCircle, FiAlertCircle, FiX, FiBarChart, FiEye, FiRefreshCw } from 'react-icons/fi';
-
+import TemplatePreviewModal from '@/components/TemplatePreviewModal';
 // --- Data Fetching Hooks --------------------------------------------------
 
 /**
@@ -267,7 +267,7 @@ const Notification = ({ info, onDismiss, themeColor }: { info: NotificationState
 export default function DashboardPage() {
     const { user, logout } = useAuth();
     const { settings, isLoading: themeLoading } = useTheme();
-
+    const [viewingCampaign, setViewingCampaign] = useState<Campaign | null>(null);
     // Feature flags
     const emailTemplateAllowed = useFeatureAllowed('emailTemplate');
     const emailLogsAllowed = useFeatureAllowed('emailLogs');
@@ -331,7 +331,12 @@ export default function DashboardPage() {
         setEditingCampaign(campaign);
         setIsCampaignFormOpen(true);
     };
-
+    const handleOpenTemplate = (campaign: Campaign) => {
+        setViewingCampaign(campaign);
+    }
+    const handleCloseTemplate = () => {
+        setViewingCampaign(null);
+    };
     const handleCloseForm = () => {
         setEditingCampaign(null);
         setIsCampaignFormOpen(false);
@@ -771,6 +776,12 @@ export default function DashboardPage() {
                                                             >
                                                                 Edit
                                                             </button>
+                                                            <button 
+                                                                onClick={() => handleOpenTemplate(campaign)}
+                                                                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:opacity-90 transition text-sm"
+                                                            >
+                                                                View
+                                                            </button>
                                                             <button
                                                                 onClick={(e) => openDeleteConfirm(campaign, e)}
                                                                 className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm"
@@ -864,6 +875,13 @@ export default function DashboardPage() {
                                 onCancel={() => setCampaignToDelete(null)}
                             />
                         )}
+                        {/* ADD THIS NEW BLOCK */}
+                        {viewingCampaign && (
+                            <TemplatePreviewModal 
+                                campaign={viewingCampaign} 
+                                onClose={handleCloseTemplate} 
+                            />
+                        )}                        
                     </>
                 )}
 
