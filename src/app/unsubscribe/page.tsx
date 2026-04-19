@@ -9,9 +9,8 @@ export default function UnsubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [isCaptchaDone, setIsCaptchaDone] = useState(false);
 
-  // Google reCAPTCHA v2 token + widget ref.
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA | null>(null);
 
   const { settings, isLoading: themeLoading } = useTheme();
@@ -21,19 +20,21 @@ export default function UnsubscribePage() {
     setMessage('');
     setError('');
 
-    // --- Check if reCAPTCHA was completed ---
-    if (!recaptchaToken) {
+    // ✅ Read token fresh from the widget at submit time (not from stale state)
+    const token = recaptchaRef.current?.getValue();
+
+    if (!token) {
       setError('Please complete the reCAPTCHA verification.');
       return;
     }
 
     setIsLoading(true);
+
     try {
       const response = await fetch('/api/unsubscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // --- Send email and token to the backend ---
-        body: JSON.stringify({ email, token: recaptchaToken }),
+        body: JSON.stringify({ email, token }),
       });
 
       const result = await response.json();
@@ -45,7 +46,6 @@ export default function UnsubscribePage() {
       setMessage(result.message);
       setEmail('');
     } catch (err: unknown) {
-      // Narrow unknown to Error if possible, otherwise use a generic message
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -53,9 +53,10 @@ export default function UnsubscribePage() {
       }
     } finally {
       setIsLoading(false);
-      // Reset v2 token and widget so it cannot be reused.
-      setRecaptchaToken(null);
+      // ✅ Always reset widget after every attempt (success or failure)
+      // so the used token is never reused
       recaptchaRef.current?.reset();
+      setIsCaptchaDone(false);
     }
   };
 
@@ -84,28 +85,36 @@ export default function UnsubscribePage() {
             />
           </div>
 
+          {/* ✅ reCAPTCHA above the button so user checks it before submitting */}
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+              onChange={(token) => setIsCaptchaDone(!!token)}
+              onExpired={() => {
+                setIsCaptchaDone(false);
+                setError('reCAPTCHA expired. Please verify again.');
+              }}
+              onError={() => {
+                setIsCaptchaDone(false);
+                setError('reCAPTCHA failed to load. Please refresh the page.');
+              }}
+              size="normal"
+            />
+          </div>
+
           <button
             type="submit"
-            disabled={isLoading || themeLoading || !recaptchaToken}
+            disabled={isLoading || themeLoading || !isCaptchaDone}
             style={{ backgroundColor: settings.themeColor }}
             className={`w-full px-4 py-2 font-semibold text-white rounded-md transition-colors duration-200 bg-black
-              ${(isLoading || !recaptchaToken)
+              ${(isLoading || !isCaptchaDone)
                 ? 'cursor-not-allowed opacity-70'
                 : 'focus:outline-none focus:ring-2 focus:ring-offset-2'
               }`}
           >
             {isLoading ? 'Processing...' : 'Unsubscribe'}
           </button>
-          {/* Google reCAPTCHA v2 checkbox widget */}
-          <div className="flex justify-center">
-            <ReCAPTCHA
-              ref={recaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-              onChange={(token) => setRecaptchaToken(token)}
-              onExpired={() => setRecaptchaToken(null)}
-              size="normal"
-            />
-          </div>
         </form>
 
         <div className="text-center">
