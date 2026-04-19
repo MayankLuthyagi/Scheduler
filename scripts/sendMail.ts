@@ -319,6 +319,17 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
                 }
                 console.log(`Audience loaded: ${contacts.length} contacts.`);
 
+                // Atomic pre-send claim for this IST day to avoid duplicate campaign runs.
+                const campaignClaim = await db.collection("Campaigns").updateOne(
+                    { _id: campaign._id, lastSendDateIST: { $ne: todayISTStr } },
+                    { $set: { lastSendDateIST: todayISTStr, todaySent: todayISTStr } }
+                );
+                if (campaignClaim.modifiedCount === 0) {
+                    console.log(`Skipping: Campaign already claimed/sent for today (${todayISTStr}).`);
+                    continue;
+                }
+                console.log(`Campaign claimed for today (${todayISTStr}). Starting send...`);
+
                 const orderedContacts = campaign.randomSend
                     ? [...contacts].sort(() => Math.random() - 0.5)
                     : contacts;
@@ -448,12 +459,6 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
             } else {
                 console.log(`Campaign "${campaign.campaignName}" has no audienceId set. Skipping.`);
             }
-
-            await db.collection("Campaigns").updateOne(
-                { _id: campaign._id },
-                { $set: { todaySent: todayISTStr } } // YYYY-MM-DD in IST — no timezone ambiguity
-            );
-            console.log(`Marked campaign as sent for today.`);
 
             // Run cleanup for false opens if emailLogs is enabled and campaign is one-on-one
             if (await isFeatureAllowed(db, 'emailLogs') && campaign.sendMethod === 'one-on-one') {
@@ -651,6 +656,17 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
             if (contacts.length === 0) { console.log(`Audience empty. Skipping.`); continue; }
             console.log(`Audience loaded: ${contacts.length} contacts.`);
 
+            // Atomic pre-send claim for this IST day to avoid duplicate automation runs.
+            const automationClaim = await db.collection("DateAutomations").updateOne(
+                { automationId: automation.automationId, sentDates: { $ne: todayIST } },
+                { $addToSet: { sentDates: todayIST }, $set: { updatedAt: new Date() } }
+            );
+            if (automationClaim.modifiedCount === 0) {
+                console.log(`Automation "${automation.name}" already claimed/sent for ${todayIST}. Skipping.`);
+                continue;
+            }
+            console.log(`Automation "${automation.name}" claimed for ${todayIST}. Starting send...`);
+
             for (const senderAddress of automation.senderEmails) {
                 const authEmail = allSenderEmails.find(e => e.email === senderAddress.trim());
                 if (!authEmail) { console.log(`Sender ${senderAddress} not found. Skipping.`); continue; }
@@ -723,12 +739,7 @@ async function sendWithRetries(transporter: any, mailOptions: any, maxRetries = 
                 transporter.close();
             }
 
-            // Mark this date as sent
-            await db.collection("DateAutomations").updateOne(
-                { automationId: automation.automationId },
-                { $addToSet: { sentDates: todayIST }, $set: { updatedAt: new Date() } }
-            );
-            console.log(`Automation "${automation.name}" marked as sent for ${todayIST}.`);
+            console.log(`Automation "${automation.name}" processing completed for ${todayIST}.`);
         }
 
         console.log("\nEmail job completed successfully!");
