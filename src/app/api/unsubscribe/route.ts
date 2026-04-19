@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         const { db } = await connectToDatabase();
         const url = new URL(request.url);
         const campaignId = url.searchParams.get('campaignId') || 'unknown';
-        
+
         let email: string | null = url.searchParams.get('email');
         let token: string | null = null;
         let isFromWebForm = false;
@@ -87,22 +87,40 @@ export async function POST(request: Request) {
             const form = await request.formData();
             email = (form.get('email') || form.get('Email'))?.toString() || null;
         }
-        
-        // --- reCAPTCHA v3 Verification (only for web form submissions) ---
+
+        // --- reCAPTCHA v2 Verification (only for web form submissions) ---
         if (isFromWebForm) {
             if (!token) {
                 return NextResponse.json({ error: 'reCAPTCHA token is missing.' }, { status: 400 });
             }
 
-            const secretKey = process.env.RECAPTCHA_V3_SECRET_KEY;
-            const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`;
-            
-            const recaptchaResponse = await fetch(verificationUrl, { method: 'POST' });
+            const secretKey = process.env.RECAPTCHA_V2_SECRET_KEY || process.env.RECAPTCHA_SECRET_KEY;
+            if (!secretKey) {
+                console.error('Missing reCAPTCHA secret. Set RECAPTCHA_V2_SECRET_KEY (or RECAPTCHA_SECRET_KEY).');
+                return NextResponse.json({ error: 'Server captcha configuration is missing.' }, { status: 500 });
+            }
+
+            const verificationUrl = `https://www.google.com/recaptcha/api/siteverify`;
+            const forwardedFor = request.headers.get('x-forwarded-for');
+            const remoteIp = forwardedFor ? forwardedFor.split(',')[0]?.trim() : undefined;
+
+            const verifyBody = new URLSearchParams({
+                secret: secretKey,
+                response: token,
+            });
+            if (remoteIp) {
+                verifyBody.append('remoteip', remoteIp);
+            }
+
+            const recaptchaResponse = await fetch(verificationUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: verifyBody,
+            });
             const verificationData = await recaptchaResponse.json();
-            
-            const scoreThreshold = 0.5; // Google's recommended default
-            if (!verificationData.success || verificationData.score < scoreThreshold) {
-                console.warn('reCAPTCHA verification failed or low score:', verificationData);
+
+            if (!verificationData.success) {
+                console.warn('reCAPTCHA v2 verification failed:', verificationData);
                 return NextResponse.json({ error: 'Bot behavior detected. Please try again.' }, { status: 400 });
             }
         }
@@ -114,7 +132,7 @@ export async function POST(request: Request) {
             // For a form submission, the reCAPTCHA token check would have already failed.
             return new Response(null, { status: 204 });
         }
-        
+
         await upsertUnsubscribe(db, email, campaignId);
         console.log(`[Unsubscribe] POST success for ${email.toLowerCase()} from campaign ${campaignId}`);
 

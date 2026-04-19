@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useRef, useState, FormEvent } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import ReCAPTCHA from 'react-google-recaptcha';
 
@@ -10,8 +10,9 @@ export default function UnsubscribePage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  // --- State for the reCAPTCHA token ---
+  // Google reCAPTCHA v2 token + widget ref.
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
 
   const { settings, isLoading: themeLoading } = useTheme();
 
@@ -52,8 +53,9 @@ export default function UnsubscribePage() {
       }
     } finally {
       setIsLoading(false);
-      // Reset the token so the user has to solve it again
+      // Reset v2 token and widget so it cannot be reused.
       setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     }
   };
 
@@ -84,7 +86,7 @@ export default function UnsubscribePage() {
 
           <button
             type="submit"
-            disabled={isLoading || themeLoading}
+            disabled={isLoading || themeLoading || !recaptchaToken}
             style={{ backgroundColor: settings.themeColor }}
             className={`w-full px-4 py-2 font-semibold text-white rounded-md transition-colors duration-200 bg-black
               ${(isLoading || !recaptchaToken)
@@ -94,12 +96,14 @@ export default function UnsubscribePage() {
           >
             {isLoading ? 'Processing...' : 'Unsubscribe'}
           </button>
-          {/* --- Google reCAPTCHA v2 Widget --- */}
+          {/* Google reCAPTCHA v2 checkbox widget */}
           <div className="flex justify-center">
             <ReCAPTCHA
+              ref={recaptchaRef}
               sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
               onChange={(token) => setRecaptchaToken(token)}
               onExpired={() => setRecaptchaToken(null)}
+              size="normal"
             />
           </div>
         </form>
