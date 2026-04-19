@@ -143,7 +143,11 @@ const MarkButton = ({ format, icon }: { format: 'bold' | 'italic' | 'code'; icon
             type="button"
             onMouseDown={e => {
                 e.preventDefault();
-                isActive ? Editor.removeMark(editor, format) : Editor.addMark(editor, format, true);
+                if (isActive) {
+                    Editor.removeMark(editor, format);
+                } else {
+                    Editor.addMark(editor, format, true);
+                }
             }}
             className="px-2 py-1 border rounded hover:bg-gray-200"
             style={{ backgroundColor: isActive ? settings.themeColor : 'white', color: isActive ? 'white' : 'inherit' }}

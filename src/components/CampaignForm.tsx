@@ -78,6 +78,7 @@ function isTodaySent(todaySent: Campaign['todaySent']): boolean {
 }
 
 type Tab = 'content' | 'scheduling' | 'sending';
+type LegacyCampaignSenderIds = { commaId?: string[] };
 
 export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, onToggleSentToday, editCampaign, isDeleting = false }: CampaignFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('content');
@@ -114,11 +115,12 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, onTo
     // Populate form with data when editing
     useEffect(() => {
         if (editCampaign) {
+            const legacyCommaIds = (editCampaign as LegacyCampaignSenderIds).commaId || [];
             reset({
                 campaignName: editCampaign.campaignName || '',
                 templateId: editCampaign.templateId || '',
                 audienceId: editCampaign.audienceId || '',
-                senderEmails: editCampaign.senderEmails || (editCampaign as any).commaId || [],
+                senderEmails: editCampaign.senderEmails || legacyCommaIds,
                 startDate: editCampaign.startDate || '',
                 endDate: editCampaign.endDate || '',
                 sendTime: editCampaign.sendTime || '',
@@ -232,14 +234,12 @@ export default function CampaignForm({ isOpen, onClose, onSubmit, onDelete, onTo
                                 type="button"
                                 disabled={isTogglingResend}
                                 onClick={() => handleSentTodayToggle(!sentTodayToggle)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
-                                    sentTodayToggle ? 'bg-amber-500' : 'bg-gray-300'
-                                }`}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${sentTodayToggle ? 'bg-amber-500' : 'bg-gray-300'
+                                    }`}
                             >
                                 <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                                        sentTodayToggle ? 'translate-x-6' : 'translate-x-1'
-                                    }`}
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sentTodayToggle ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
                                 />
                             </button>
                         </label>

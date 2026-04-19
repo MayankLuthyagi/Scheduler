@@ -7,7 +7,7 @@ export async function GET() {
         const { db } = await connectToDatabase();
         const templates = await db.collection('EmailTemplates').find({}).sort({ createdAt: -1 }).toArray();
         return NextResponse.json({ success: true, templates });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ success: false, error: 'Failed to fetch templates' }, { status: 500 });
     }
 }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
         await db.collection('EmailTemplates').insertOne(template);
         return NextResponse.json({ success: true, template });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ success: false, error: 'Failed to create template' }, { status: 500 });
     }
 }

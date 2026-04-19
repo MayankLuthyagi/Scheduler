@@ -775,7 +775,7 @@ export default function DashboardPage() {
                                         <div className="bg-white rounded-lg p-12 text-center shadow-sm">
                                             <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
                                             <p className="text-gray-600 font-semibold">No templates yet</p>
-                                            <p className="text-gray-500 text-sm mt-1">Click "New Template" to create one.</p>
+                                            <p className="text-gray-500 text-sm mt-1">Click &quot;New Template&quot; to create one.</p>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -893,7 +893,7 @@ export default function DashboardPage() {
                                         <div className="bg-white rounded-lg p-12 text-center shadow-sm">
                                             <FiMail className="text-gray-300 text-5xl mx-auto mb-4" />
                                             <p className="text-gray-600 font-semibold">No broadcasts yet</p>
-                                            <p className="text-gray-500 text-sm mt-1">Click "New Broadcast" to schedule one.</p>
+                                            <p className="text-gray-500 text-sm mt-1">Click &quot;New Broadcast&quot; to schedule one.</p>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -928,7 +928,7 @@ export default function DashboardPage() {
                                         <div className="bg-white rounded-lg p-12 text-center shadow-sm">
                                             <FiCalendar className="text-gray-300 text-5xl mx-auto mb-4" />
                                             <p className="text-gray-600 font-semibold">No automations yet</p>
-                                            <p className="text-gray-500 text-sm mt-1">Click "New Automation" to create one.</p>
+                                            <p className="text-gray-500 text-sm mt-1">Click &quot;New Automation&quot; to create one.</p>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

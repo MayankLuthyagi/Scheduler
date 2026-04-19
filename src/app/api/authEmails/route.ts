@@ -8,7 +8,11 @@ export async function GET() {
         const emails = await db.collection('AuthEmails').find({}).toArray();
 
         // Never expose app_password to the client
-        const safeEmails = emails.map(({ app_password: _removed, ...rest }) => rest);
+        const safeEmails = emails.map((email) => {
+            const safeEmail = { ...email };
+            delete (safeEmail as { app_password?: string }).app_password;
+            return safeEmail;
+        });
 
         return NextResponse.json({ success: true, emails: safeEmails });
     } catch (error) {
@@ -57,7 +61,8 @@ export async function POST(request: NextRequest) {
         const result = await db.collection('AuthEmails').insertOne(newEmail);
 
         // Return the record without the encrypted password
-        const { app_password: _removed, ...safeEmail } = newEmail;
+        const safeEmail = { ...newEmail };
+        delete (safeEmail as { app_password?: string }).app_password;
         return NextResponse.json({
             success: true,
             email: { ...safeEmail, _id: result.insertedId }

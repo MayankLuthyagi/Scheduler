@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
         };
 
         await db.collection('Audiences').insertOne(audience);
-        const { contacts: _c, ...audienceSummary } = audience;
+        const audienceSummary = { ...audience };
+        delete (audienceSummary as { contacts?: typeof contacts }).contacts;
         return NextResponse.json({ success: true, audience: audienceSummary });
     } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);

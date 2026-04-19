@@ -3,7 +3,6 @@
 import React, { useState, useRef } from 'react';
 import { FiX, FiUploadCloud, FiTrash2, FiUsers, FiAlertCircle } from 'react-icons/fi';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Audience } from '@/types/audience';
 
 interface Props {
     isOpen: boolean;
